@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@theme {
+  --color-secondary-fixed: #e2dfff;
+  --color-primary-fixed: #dce1ff;
+  --color-on-surface: #131b2e;
+  --color-on-secondary-container: #fffbff;
+  --color-on-tertiary-fixed-variant: #005236;
+  --color-on-tertiary: #ffffff;
+  --color-on-surface-variant: #444651;
+  --color-on-primary-fixed: #00164e;
+  --color-tertiary-container: #004a31;
+  --color-surface-container: #eaedff;
+  --color-on-secondary-fixed-variant: #3323cc;
+  --color-surface-variant: #dae2fd;
+  --color-secondary-container: #645efb;
+  --color-on-secondary-fixed: #0f0069;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-primary-container: #90a8ff;
+  --color-secondary-fixed-dim: #c3c0ff;
+  --color-on-secondary: #ffffff;
+  --color-on-background: #131b2e;
+  --color-surface-container-low: #f2f3ff;
+  --color-outline-variant: #c5c5d3;
+  --color-primary-container: #1e3a8a;
+  --color-primary: #00236f;
+  --color-on-primary-fixed-variant: #264191;
+  --color-surface-bright: #faf8ff;
+  --color-on-error-container: #93000a;
+  --color-surface-container-high: #e2e7ff;
+  --color-surface-container-highest: #dae2fd;
+  --color-on-error: #ffffff;
+  --color-inverse-surface: #283044;
+  --color-on-primary: #ffffff;
+  --color-outline: #757682;
+  --color-primary-fixed-dim: #b6c4ff;
+  --color-inverse-primary: #b6c4ff;
+  --color-background: #faf8ff;
+  --color-error: #ba1a1a;
+  --color-on-tertiary-fixed: #002113;
+  --color-tertiary: #00311f;
+  --color-surface-dim: #d2d9f4;
+  --color-surface-tint: #4059aa;
+  --color-surface: #faf8ff;
+  --color-inverse-on-surface: #eef0ff;
+  --color-secondary: #4b41e1;
+  --color-on-tertiary-container: #27c38a;
+  --color-error-container: #ffdad6;
+  --color-tertiary-fixed-dim: #4edea3;
+  --color-tertiary-fixed: #6ffbbe;
+
+  --spacing-margin: 2rem;
+  --spacing-margin-sm: 1rem;
+  --spacing-space-xs: 0.25rem;
+  --spacing-space-sm: 0.5rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-space-xl: 2.5rem;
+  --spacing-gutter-sm: 1rem;
+  --spacing-gutter: 1.5rem;
+
+  --font-headline-xl: "Space Grotesk", sans-serif;
+  --font-headline-lg: "Space Grotesk", sans-serif;
+  --font-headline-md: "Space Grotesk", sans-serif;
+  --font-headline-sm: "Space Grotesk", sans-serif;
+  --font-body-lg: "Plus Jakarta Sans", sans-serif;
+  --font-body-md: "Plus Jakarta Sans", sans-serif;
+  --font-body-sm: "Plus Jakarta Sans", sans-serif;
+  --font-label-lg: "Plus Jakarta Sans", sans-serif;
+  --font-label-md: "Plus Jakarta Sans", sans-serif;
+  --font-code-timer: "JetBrains Mono", "Plus Jakarta Sans", sans-serif;
+  --font-code-meta: "JetBrains Mono", "Plus Jakarta Sans", sans-serif;
+}
+
+@layer utilities {
+  .text-headline-xl {
+    font-size: 40px;
+    line-height: 48px;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  .text-headline-lg {
+    font-size: 32px;
+    line-height: 40px;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  .text-headline-md {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+  }
+  .text-headline-sm {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+  .text-body-lg {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 400;
+  }
+  .text-body-md {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+  }
+  .text-body-sm {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+  .text-label-lg {
+    font-size: 14px;
+    line-height: 20px;
+    letter-spacing: 0.01em;
+    font-weight: 600;
+  }
+  .text-label-md {
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
+  .text-code-timer {
+    font-size: 28px;
+    line-height: 32px;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .text-code-meta {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+
+.material-symbols-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+

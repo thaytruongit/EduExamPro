@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdminUser() {
+      return isAuthenticated() &&
+        request.auth.token.email == "manhtruongdo1984@gmail.com";
+    }
+
+    function isValidExam(data) {
+      return data.keys().hasAll(['id', 'code', 'title', 'subject', 'grade', 'durationMinutes', 'questionsJson', 'createdAt']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 120 &&
+        data.code is string && data.code.size() > 0 && data.code.size() <= 60 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
+        data.subject is string && data.subject.size() > 0 && data.subject.size() <= 120 &&
+        data.grade is number && data.grade >= 6 && data.grade <= 9 &&
+        data.durationMinutes is number && data.durationMinutes >= 5 && data.durationMinutes <= 180 &&
+        data.questionsJson is string && data.questionsJson.size() <= 200000 &&
+        data.createdAt is string && data.createdAt.size() <= 60;
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll(['id', 'sbd', 'name', 'grade', 'className', 'durationSeconds', 'tabLeaves', 'rawScore', 'finalScore', 'status', 'submittedAt']) &&
+        data.id is string && data.id.size() > 0 && data.id.size() <= 120 &&
+        data.sbd is string && data.sbd.size() > 0 && data.sbd.size() <= 60 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+        data.grade is number && data.grade >= 6 && data.grade <= 9 &&
+        data.className is string && data.className.size() > 0 && data.className.size() <= 30 &&
+        data.durationSeconds is number && data.durationSeconds >= 0 && data.durationSeconds <= 20000 &&
+        data.tabLeaves is number && data.tabLeaves >= 0 && data.tabLeaves <= 100 &&
+        data.rawScore is number && data.rawScore >= 0 && data.rawScore <= 10 &&
+        data.finalScore is number && data.finalScore >= 0 && data.finalScore <= 10 &&
+        data.status is string && data.status.size() <= 60 &&
+        data.submittedAt is string && data.submittedAt.size() <= 60;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['sessionKey', 'sbd', 'fullName', 'grade', 'studentClass', 'remainingSeconds', 'tabViolations', 'updatedAt']) &&
+        data.sessionKey is string && data.sessionKey.size() > 0 && data.sessionKey.size() <= 120 &&
+        data.sbd is string && data.sbd.size() > 0 && data.sbd.size() <= 60 &&
+        data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 150 &&
+        data.grade is number && data.grade >= 6 && data.grade <= 9 &&
+        data.studentClass is string && data.studentClass.size() > 0 && data.studentClass.size() <= 30 &&
+        data.remainingSeconds is number && data.remainingSeconds >= 0 && data.remainingSeconds <= 20000 &&
+        data.tabViolations is number && data.tabViolations >= 0 && data.tabViolations <= 100 &&
+        data.updatedAt is string && data.updatedAt.size() <= 60;
+    }
+
+    match /exams/{examId} {
+      allow read: if true;
+      allow create, update: if isValidExam(request.resource.data);
+      allow delete: if isAuthenticated() || resource.data.id == examId;
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow create, update: if isValidSubmission(request.resource.data);
+      allow delete: if isAuthenticated() || resource.data.id == submissionId;
+    }
+
+    match /examSessions/{sessionId} {
+      allow read: if true;
+      allow create, update: if isValidSession(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /adminConfig/{docId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['updatedAt']) &&
+        request.resource.data.updatedAt is string;
+    }
+  }
+}

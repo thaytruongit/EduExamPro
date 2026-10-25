@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><title>EduExam Pro - Hệ Thống Thi Trực Tuyến &amp; Khảo Thí THCS</title><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"secondary-fixed":"#e2dfff","primary-fixed":"#dce1ff","on-surface":"#131b2e","on-secondary-container":"#fffbff","on-tertiary-fixed-variant":"#005236","on-tertiary":"#ffffff","on-surface-variant":"#444651","on-primary-fixed":"#00164e","tertiary-container":"#004a31","surface-container":"#eaedff","on-secondary-fixed-variant":"#3323cc","surface-variant":"#dae2fd","secondary-container":"#645efb","on-secondary-fixed":"#0f0069","surface-container-lowest":"#ffffff","on-primary-container":"#90a8ff","secondary-fixed-dim":"#c3c0ff","on-secondary":"#ffffff","on-background":"#131b2e","surface-container-low":"#f2f3ff","outline-variant":"#c5c5d3","primary-container":"#1e3a8a","primary":"#00236f","on-primary-fixed-variant":"#264191","surface-bright":"#faf8ff","on-error-container":"#93000a","surface-container-high":"#e2e7ff","surface-container-highest":"#dae2fd","on-error":"#ffffff","inverse-surface":"#283044","on-primary":"#ffffff","outline":"#757682","primary-fixed-dim":"#b6c4ff","inverse-primary":"#b6c4ff","background":"#faf8ff","error":"#ba1a1a","on-tertiary-fixed":"#002113","tertiary":"#00311f","surface-dim":"#d2d9f4","surface-tint":"#4059aa","surface":"#faf8ff","inverse-on-surface":"#eef0ff","secondary":"#4b41e1","on-tertiary-container":"#27c38a","error-container":"#ffdad6","tertiary-fixed-dim":"#4edea3","tertiary-fixed":"#6ffbbe"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"margin":"2rem","space-sm":"0.5rem","space-xs":"0.25rem","margin-sm":"1rem","space-md":"1rem","space-lg":"1.5rem","gutter-sm":"1rem","space-xl":"2.5rem","gutter":"1.5rem"},"fontFamily":{"headline-md":["Space Grotesk"],"headline-sm":["Space Grotesk"],"headline-lg":["Space Grotesk"],"label-md":["Plus Jakarta Sans"],"code-timer":["JetBrains Mono"],"body-md":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-lg-mobile":["Space Grotesk"],"code-meta":["JetBrains Mono"],"headline-xl":["Space Grotesk"],"headline-xl-mobile":["Space Grotesk"],"label-lg":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"]},"fontSize":{"headline-md":["24px",{"lineHeight":"32px","fontWeight":"600"}],"headline-sm":["20px",{"lineHeight":"28px","fontWeight":"600"}],"headline-lg":["32px",{"lineHeight":"40px","letterSpacing":"-0.01em","fontWeight":"600"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"600"}],"code-timer":["28px",{"lineHeight":"32px","letterSpacing":"0.04em","fontWeight":"700"}],"body-md":["16px",{"lineHeight":"24px","fontWeight":"400"}],"body-sm":["14px",{"lineHeight":"20px","fontWeight":"400"}],"headline-lg-mobile":["24px",{"lineHeight":"32px","letterSpacing":"-0.01em","fontWeight":"600"}],"code-meta":["12px",{"lineHeight":"16px","fontWeight":"500"}],"headline-xl":["40px",{"lineHeight":"48px","letterSpacing":"-0.02em","fontWeight":"700"}],"headline-xl-mobile":["30px",{"lineHeight":"38px","letterSpacing":"-0.01em","fontWeight":"700"}],"label-lg":["14px",{"lineHeight":"20px","letterSpacing":"0.01em","fontWeight":"600"}],"body-lg":["18px",{"lineHeight":"28px","fontWeight":"400"}]}}}};</script><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&amp;family=Plus+Jakarta+Sans:wght@400;600&amp;family=Space+Grotesk:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/></head><body class="bg-background font-body-md text-on-surface antialiased"><header class="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-20 w-full px-gutter flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-md"><img alt="EduExam Pro Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1U2-TxOIOg84pDjVscTVC8QUSp5DJR3gJwXtbOLoxA7AztUU_lOaalByhZjOchMbxklIKo0JhkzV_h7HqiBtRRPE4FhTkMIL0Ts59HXTTM7KKvSGXqdus4icK-prY6rT4SO0c68hbsWkwBYr4ncAGHXv27a2MR31dLfAwzUShi0PBr9ivD9eaLah1yXGZHVC2IN7hdq0rFjGBjshU-KsOjZhp3rCuDinViK0I0udYzK69PJzSbgxRvZyh8"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-primary leading-tight tracking-tight">EduExam Pro</span><span class="font-label-md text-label-md text-on-surface-variant font-normal">Hệ Thống Thi Trực Tuyến &amp; Khảo Thí THCS (Khối 6-9)</span></div></div><nav class="hidden xl:flex items-center gap-space-xs bg-surface-container-low p-space-xs rounded-xl" data-active-classes="bg-primary-container text-on-primary font-label-lg rounded-lg"><a class="px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="cong-vao-thi" href="#">Cổng Vào Thi (Học Sinh)</a><a class="px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="phong-thi-truc-tuyen" href="#">Phòng Thi Trực Tuyến</a><a class="px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="ket-qua-bang-diem" href="#">Kết Quả &amp; Bảng Điểm</a><a class="flex items-center gap-space-xs px-space-md py-space-sm font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors rounded-lg" data-path="khu-vuc-quan-tri" href="#"><span class="material-symbols-outlined text-[18px]">lock</span>Khu Vực Quản Trị (Cần Mật Khẩu)</a></nav><div class="flex items-center gap-space-md"><div class="hidden sm:flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-full"><span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary-fixed-dim opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-on-tertiary-container"></span></span><span class="font-code-meta text-code-meta text-on-surface font-semibold">Hệ thống giám sát AI đang bật</span></div><div class="flex items-center gap-space-sm bg-surface-container-low p-space-xs rounded-full pr-space-md"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBOWopttBgDTwwdbyfXXDVXaT2z2fVFsLzzEZKoGzeetqHY1KtSdmdLW58wsdtrIzg01m3LHslFVie655_YActpQOCuYJdGBspVKJoZLQ2zr2GX4cGE-V2khY25liVu9EkxdXMsx_QHkh4qjXdK_5T4kL0PJv_CR7Hn_JPXh3b-k9snk28qDvS4crrTruZW2v-r9-NDMKmW0Tqrn8DY8u6ynwjtGVxRP5dXyuAsR6zvNkwrQcoaalYD"/><div class="hidden md:flex flex-col text-left"><span class="font-label-md text-label-md text-on-surface leading-tight font-semibold">Cán Bộ Coi Thi / Học Sinh</span><span class="font-code-meta text-code-meta text-on-surface-variant">Phòng Khảo Thí Số 08</span></div></div></div></div></header><main class="w-full pt-20 bg-background min-h-screen"><div class="flex flex-col w-full">
+<div class="w-full px-gutter py-space-lg flex flex-col gap-space-xl">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-sm font-label-md text-label-md text-on-surface-variant">
+<span class="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-[16px]">school</span>
+          Hệ Thống Khảo Thí THCS
+        </span>
+<span class="text-outline-variant">/</span>
+<span class="hover:text-primary transition-colors cursor-pointer">Khối 9</span>
+<span class="text-outline-variant">/</span>
+<span class="text-primary font-semibold">Báo Cáo Điểm Số &amp; Khảo Thí Tự Động</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center gap-space-xs px-3 py-1 rounded-full bg-surface-container text-primary font-code-meta text-code-meta shadow-sm">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+          Khảo thí mã hóa: SHA-256 #EX-2024-9A1-084
+        </span>
+<span class="inline-flex items-center gap-space-xs px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+          Đã chốt hội đồng chấm
+        </span>
+</div>
+</div>
+<section class="relative w-full rounded-xl bg-surface-container-lowest shadow-xl overflow-hidden">
+<div class="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-gradient-to-br from-secondary/15 via-primary/5 to-transparent blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-24 -left-20 w-80 h-80 rounded-full bg-gradient-to-tr from-tertiary-fixed-dim/20 to-transparent blur-2xl pointer-events-none"></div>
+<div class="relative p-space-lg md:p-space-xl flex flex-col gap-space-lg">
+<div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-lg">
+<div class="flex items-center gap-space-lg">
+<div class="relative">
+<img class="w-20 h-20 md:w-24 md:h-24 rounded-xl object-cover shadow-md" data-alt="Chân dung học sinh nam trung học cơ sở Việt Nam lớp 9 mặc áo đồng phục học sinh trắng thắt cà vạt xanh navy, khuôn mặt tươi tắn thông minh, ánh sáng tự nhiên studio trường học, hậu cảnh mờ nhẹ tông màu xanh phấn dịu mắt." src="https://lh3.googleusercontent.com/aida-public/AB6AXuADsmID5bwi5-o4EHvdKsfkHdM1gD71Sq-upLhHh5_i8WHf5TJlkTQiOxbZQk1cYXlBfm8dhNETVy6DjHMngmt53CL5KhVYV_3-gpow2cVzvuCJ96Udb0qofaXt5qPB6fV5BBti3T6Kn-M25C8AJFbx_2svAPnQiNKJq5g6UabbuFO0R_eXdv2cffrrqkIYC6FG2JQChjzopq5Y8lUvKOrXOYBVqGQUy-N9LcMetJkOm_oEDw1DtKrM"/>
+<span class="absolute -bottom-2 -right-2 px-2 py-0.5 rounded-md bg-primary text-on-primary font-code-meta text-[11px] font-bold shadow">
+                LỚP 9A1
+              </span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs flex-wrap">
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Nguyễn Hoàng Minh</h1>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-md text-label-md font-bold">
+                  Khối 9 THCS
+                </span>
+</div>
+<div class="flex items-center gap-space-md text-on-surface-variant font-body-sm text-body-sm mt-1 flex-wrap">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">badge</span> SBD: 09-084
+                </span>
+<span class="text-outline-variant">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">calendar_today</span> Ngày thi: 24/10/2024
+                </span>
+<span class="text-outline-variant">•</span>
+<span class="font-code-meta text-code-meta text-primary font-semibold">Đề: KHTN-Chuyên Đề Tốc Độ &amp; Lực</span>
+</div>
+</div>
+</div>
+<div class="flex flex-row items-center gap-space-md bg-surface-container-low p-space-md rounded-xl shadow-sm w-full lg:w-auto justify-between lg:justify-end">
+<div class="flex flex-col text-right">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Điểm Tổng Kết</span>
+<div class="flex items-baseline gap-1">
+<span class="font-code-timer text-4xl text-primary font-bold tracking-tight">8.0</span>
+<span class="font-headline-sm text-headline-sm text-outline">/ 10.0</span>
+</div>
+</div>
+<div class="h-12 w-[1px] bg-outline-variant/30"></div>
+<div class="flex flex-col items-center justify-center px-space-md py-space-xs bg-tertiary-container text-on-tertiary-container rounded-lg">
+<span class="font-label-md text-label-md font-bold uppercase tracking-wider">Xếp Loại</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-tertiary">GIỎI</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant font-semibold">Điểm Thô Máy Chấm</span>
+<span class="material-symbols-outlined text-primary text-[20px]">calculate</span>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-primary">9.0</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ 10 điểm</span>
+</div>
+<p class="font-body-sm text-[13px] text-on-surface-variant mt-1">
+                Trắc nghiệm: 7.5đ (9/10 câu) • Tự luận &amp; Điền: 1.5đ (2 câu)
+              </p>
+</div>
+</div>
+<div class="p-space-md rounded-lg bg-error-container/40 flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-error font-semibold">Khấu Trừ Vi Phạm</span>
+<span class="material-symbols-outlined text-error text-[20px]">warning</span>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-error">-1.0</span>
+<span class="font-body-sm text-body-sm text-error/80">điểm</span>
+</div>
+<p class="font-body-sm text-[13px] text-error mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">hard_drive</span>
+                1 lần rời tab (lúc 00:04:12)
+              </p>
+</div>
+</div>
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface-variant font-semibold">Thời Gian Làm Bài</span>
+<span class="material-symbols-outlined text-tertiary-container text-[20px]">schedule</span>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-1">
+<span class="font-code-timer text-2xl text-on-surface font-bold">18:45</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">/ 30:00</span>
+</div>
+<div class="flex items-center gap-1 mt-1 text-on-tertiary-fixed-variant font-label-md text-[13px] font-semibold">
+<span class="material-symbols-outlined text-[15px]">verified</span>
+                Hợp lệ (&gt; 1 phút, không phạt AI)
+              </div>
+</div>
+</div>
+<div class="p-space-md rounded-lg bg-primary-container text-on-primary flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-primary-fixed font-semibold">Điểm Thực Nhận</span>
+<span class="material-symbols-outlined text-primary-fixed text-[20px]">gavel</span>
+</div>
+<div class="mt-space-md">
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-white">8.0</span>
+<span class="font-body-sm text-body-sm text-primary-fixed">/ 10 điểm</span>
+</div>
+<p class="font-body-sm text-[13px] text-primary-fixed mt-1">
+                Đã xử lý kỷ luật giám sát AI &amp; Hội đồng khảo thí
+              </p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<div class="xl:col-span-8 flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm bg-surface-container-lowest p-space-md rounded-xl shadow-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[24px]">fact_check</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-primary">Phân Tích Chi Tiết 12 Câu Hỏi</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Bóc tách đối soát tự động &amp; Xử lý NLP từ khóa AI</p>
+</div>
+</div>
+<div class="flex items-center gap-space-xs font-label-md text-label-md flex-wrap">
+<span class="px-2.5 py-1 rounded bg-tertiary-fixed-dim/30 text-on-tertiary-fixed-variant font-bold">11 Đúng</span>
+<span class="px-2.5 py-1 rounded bg-error-container text-error font-bold">1 Sai</span>
+<span class="px-2.5 py-1 rounded bg-secondary-fixed text-on-secondary-fixed font-bold">1 Khớp NLP AI</span>
+</div>
+</div>
+<div class="space-y-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-sm transition-all hover:shadow-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-code-meta font-bold text-sm">
+                  01
+                </span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Trắc Nghiệm Đơn (0.83 điểm)</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container font-code-meta text-[11px] text-on-surface-variant">Lực và Gia tốc</span>
+</div>
+<span class="flex items-center gap-1 font-label-md text-label-md text-on-tertiary-fixed-variant font-bold bg-tertiary-fixed-dim/20 px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px]">check_circle</span> Đúng (+0.83đ)
+              </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-medium mt-1">
+              Đơn vị đo của vận tốc trong hệ thống đo lường quốc tế (SI) là gì?
+            </p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm font-body-sm text-body-sm mt-space-xs">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">CÂU TRẢ LỜI CỦA THÍ SINH</span>
+<span class="font-semibold text-primary flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-on-tertiary-container text-[16px]">done</span> B. Mét trên giây (m/s)
+                </span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">ĐÁP ÁN CHUẨN CỦA ĐỀ</span>
+<span class="font-semibold text-on-surface mt-0.5">B. Mét trên giây (m/s)</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-bright text-on-surface-variant font-body-sm text-[13px] flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px] mt-0.5">info</span>
+<span><strong>Giải thích:</strong> Vận tốc được xác định bằng quãng đường chia cho thời gian. Quãng đường đo bằng mét (m), thời gian đo bằng giây (s).</span>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-sm transition-all hover:shadow-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-error-container text-error flex items-center justify-center font-code-meta font-bold text-sm">
+                  04
+                </span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Trắc Nghiệm Đơn (0.83 điểm)</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container font-code-meta text-[11px] text-on-surface-variant">Quang Học</span>
+</div>
+<span class="flex items-center gap-1 font-label-md text-label-md text-error font-bold bg-error-container/60 px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px]">cancel</span> Sai (0.00đ)
+              </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-medium mt-1">
+              Thấu kính phân kì luôn cho ảnh có tính chất nào dưới đây đối với một vật sáng thật?
+            </p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm font-body-sm text-body-sm mt-space-xs">
+<div class="p-space-sm rounded-lg bg-error-container/30 flex flex-col">
+<span class="font-label-md text-[11px] text-error font-semibold">CÂU TRẢ LỜI CỦA THÍ SINH</span>
+<span class="font-semibold text-error flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-error text-[16px]">close</span> C. Ảnh thật, cùng chiều, nhỏ hơn vật
+                </span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">ĐÁP ÁN CHUẨN CỦA ĐỀ</span>
+<span class="font-semibold text-on-surface mt-0.5">A. Ảnh ảo, cùng chiều, nhỏ hơn vật</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-bright text-on-surface-variant font-body-sm text-[13px] flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px] mt-0.5">lightbulb</span>
+<span><strong>Giải thích:</strong> Vật sáng đặt ở mọi vị trí trước thấu kính phân kì luôn cho ảnh ảo, cùng chiều, nhỏ hơn vật và luôn nằm trong khoảng tiêu cự.</span>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-sm transition-all hover:shadow-md relative overflow-hidden">
+<div class="absolute top-0 right-0 w-1.5 h-full bg-secondary"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-code-meta font-bold text-sm">
+                  11
+                </span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Điền Khuyết Tự Động (1.00 điểm)</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed/50 font-code-meta text-[11px] text-on-secondary-fixed-variant font-bold">Chuỗi ký tự (String match)</span>
+</div>
+<span class="flex items-center gap-1 font-label-md text-label-md text-on-tertiary-fixed-variant font-bold bg-tertiary-fixed-dim/20 px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px]">check_circle</span> Khớp chính xác (+1.00đ)
+              </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-medium mt-1">
+              "Khi một lực tác dụng vào một vật, đại lượng đặc trưng cho tác dụng làm quay của lực quanh một trục được gọi là <span class="px-2 py-0.5 rounded bg-surface-container font-mono text-primary font-bold">[ ... ]</span> của lực."
+            </p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-sm font-body-sm text-body-sm mt-space-xs">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">THÍ SINH NHẬP</span>
+<span class="font-code-meta text-[11px] text-primary font-bold">100% Match</span>
+</div>
+<span class="font-mono text-base font-bold text-primary mt-1">"momen"</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">DANH SÁCH CHẤP NHẬN (REGEX)</span>
+<span class="font-mono text-body-sm text-on-surface mt-1">['momen', 'mômen', 'moment', 'Momen']</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-bright text-on-surface-variant font-body-sm text-[13px] flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">verified</span>
+<span><strong>Đối soát chuỗi:</strong> Hệ thống tự động chuẩn hóa ký tự không dấu và viết hoa. Chuỗi người dùng trùng khớp mẫu hợp lệ.</span>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-sm transition-all hover:shadow-md relative overflow-hidden">
+<div class="absolute top-0 right-0 w-1.5 h-full bg-on-tertiary-container"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-code-meta font-bold text-sm">
+                  12
+                </span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Trả Lời Ngắn NLP AI (0.50 điểm)</span>
+<span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-code-meta text-[11px] font-bold">AI Semantic Parser</span>
+</div>
+<span class="flex items-center gap-1 font-label-md text-label-md text-on-tertiary-fixed-variant font-bold bg-tertiary-fixed-dim/20 px-2.5 py-1 rounded-full">
+<span class="material-symbols-outlined text-[16px]">neurology</span> Đạt từ khóa AI (+0.50đ)
+              </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-medium mt-1">
+              Nêu ý nghĩa vật lý của định luật bảo toàn năng lượng trong hiện tượng chuyển hóa cơ năng thành nhiệt năng.
+            </p>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">CÂU TRẢ LỜI CỦA THÍ SINH</span>
+<p class="font-body-sm text-body-sm text-on-surface italic bg-surface p-2 rounded">
+                "Năng lượng không tự nhiên sinh ra hay mất đi, cơ năng hao hụt do ma sát đã biến đổi hoàn toàn thành nhiệt năng làm nóng vật."
+              </p>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col gap-space-xs font-body-sm text-[13px]">
+<span class="font-label-md text-[11px] text-on-surface-variant font-semibold">PHÂN TÍCH TỪ KHÓA MÁY CHẤM (KEYWORD EXTRACTION)</span>
+<div class="flex flex-wrap gap-1.5">
+<span class="px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary font-code-meta text-[11px]">✓ không sinh ra/mất đi</span>
+<span class="px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary font-code-meta text-[11px]">✓ chuyển hóa / biến đổi</span>
+<span class="px-2 py-0.5 rounded bg-tertiary-container text-on-tertiary font-code-meta text-[11px]">✓ nhiệt năng</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-highest text-on-surface font-code-meta text-[11px]">Độ tương đồng ngữ nghĩa: 94.2%</span>
+</div>
+</div>
+</div>
+<div class="p-space-md rounded-xl bg-surface-container-low flex items-center justify-between text-on-surface-variant">
+<span class="font-body-sm text-body-sm">Đang hiển thị 4 câu đại diện tiêu biểu (Phần trắc nghiệm 1–10, Điền khuyết 11, Trả lời ngắn 12).</span>
+<button class="px-4 py-2 rounded-lg bg-surface-container text-primary font-label-md text-label-md font-semibold hover:bg-surface-variant transition-colors flex items-center gap-1">
+<span>Xem đầy đủ 12 câu</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+<div class="xl:col-span-4 flex flex-col gap-space-md">
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">monitoring</span>
+<h3 class="font-headline-sm text-headline-sm text-primary">Tiến Độ Qua Các Lần Thi</h3>
+</div>
+<span class="font-code-meta text-code-meta text-on-surface-variant">Khối 9 Kỳ I</span>
+</div>
+<div class="p-space-md rounded-lg bg-surface-container-low flex flex-col gap-space-sm">
+<div class="flex justify-between items-end h-28 pt-4 px-2">
+<div class="flex flex-col items-center gap-1 group flex-1">
+<span class="font-code-meta text-code-meta text-on-surface-variant font-bold">7.0</span>
+<div class="w-8 bg-surface-tint rounded-t-lg transition-all group-hover:bg-primary" style="height: 70px;"></div>
+<span class="font-label-md text-[11px] text-on-surface-variant mt-1">Lần 1</span>
+</div>
+<div class="flex flex-col items-center gap-1 group flex-1">
+<span class="font-code-meta text-code-meta text-primary font-bold">8.0</span>
+<div class="w-8 bg-primary rounded-t-lg transition-all" style="height: 80px;"></div>
+<span class="font-label-md text-[11px] text-primary font-bold mt-1">Lần 2 (Nay)</span>
+</div>
+<div class="flex flex-col items-center gap-1 group flex-1">
+<span class="font-code-meta text-code-meta text-outline-variant">--</span>
+<div class="w-8 bg-surface-container-highest rounded-t-lg" style="height: 15px;"></div>
+<span class="font-label-md text-[11px] text-outline mt-1">Lần 3</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-body-sm text-[12px] pt-2">
+<span>Xu hướng: <strong class="text-tertiary-container font-semibold">Tăng +1.0 điểm</strong> so với Lần 1</span>
+<span class="font-code-meta text-code-meta font-bold">Trung bình: 7.50</span>
+</div>
+</div>
+<div class="space-y-space-sm">
+<span class="font-label-md text-label-md text-on-surface-variant font-semibold uppercase tracking-wider">Lịch Sử Các Bài Khảo Thí</span>
+<div class="p-space-sm rounded-lg bg-surface flex items-center justify-between transition-colors hover:bg-surface-container">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Lần 1: Khảo sát Toán 9</span>
+<span class="font-code-meta text-code-meta text-on-surface-variant">10/10/2024 • 0 vi phạm tab</span>
+</div>
+<div class="text-right">
+<span class="font-code-timer text-lg font-bold text-on-surface">7.0</span>
+<span class="block font-label-md text-[11px] text-on-surface-variant">Khá</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-primary/5 flex items-center justify-between">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-label-lg text-label-lg font-bold text-primary">Lần 2: KHTN Khối 9</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<span class="font-code-meta text-code-meta text-error font-medium">24/10/2024 • 1 lần rời tab</span>
+</div>
+<div class="text-right">
+<span class="font-code-timer text-lg font-bold text-primary">8.0</span>
+<span class="block font-label-md text-[11px] text-on-tertiary-fixed-variant font-bold">Giỏi</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface flex items-center justify-between opacity-60">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-semibold text-on-surface">Lần 3: Khảo sát đợt 3</span>
+<span class="font-code-meta text-code-meta text-on-surface-variant">Dự kiến: 15/11/2024</span>
+</div>
+<div class="text-right">
+<span class="font-label-md text-label-md text-outline">Chưa mở</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-error text-[22px]">policy</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Nhật Ký Vi Phạm Giám Sát AI</h3>
+</div>
+<div class="p-space-md rounded-lg bg-error-container/30 flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-code-meta text-code-meta text-error font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">visibility_off</span>
+                Sự kiện: Mất tiêu điểm trình duyệt (Blur)
+              </span>
+<span class="font-code-meta text-code-meta text-error font-bold">00:04:12</span>
+</div>
+<p class="font-body-sm text-[13px] text-on-surface">
+              Học sinh đã chuyển sang cửa sổ khác trong <strong>4.8 giây</strong>. Hệ thống AI tự động ghi nhận và áp dụng mức khấu trừ chuẩn: <strong>-1.0 điểm</strong> theo quy chế khảo thí trực tuyến THCS.
+            </p>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-[12px]">
+<span class="material-symbols-outlined text-[16px]">gavel</span>
+<span>Biên bản điện tử được ký số tự động bởi Hệ Thống Khảo Thí EduExam Pro.</span>
+</div>
+</div>
+<div class="p-space-lg rounded-xl bg-gradient-to-br from-primary-container to-primary text-on-primary shadow-lg flex flex-col gap-space-md">
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-primary-fixed">Tác Vụ Thí Sinh &amp; Phụ Huynh</span>
+<h4 class="font-headline-sm text-headline-sm text-white mt-1">Xuất Phiếu Điểm &amp; Lưu Trữ</h4>
+</div>
+<div class="flex flex-col gap-space-sm">
+<button class="w-full py-3 px-space-md rounded-lg bg-surface-container-lowest text-primary font-label-lg text-label-lg font-bold shadow-md hover:bg-surface-container-low transition-all flex items-center justify-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px]">download</span>
+              Tải Phiếu Điểm PDF (Có Ký Số)
+            </button>
+<button class="w-full py-3 px-space-md rounded-lg bg-primary-fixed text-on-primary-fixed font-label-lg text-label-lg font-semibold hover:bg-white transition-all flex items-center justify-center gap-space-xs">
+<span class="material-symbols-outlined text-[20px]">menu_book</span>
+              Xem Lại Toàn Bộ Bài Giải Chi Tiết
+            </button>
+<a class="w-full py-2.5 px-space-md rounded-lg text-primary-fixed text-center font-label-md text-label-md hover:text-white transition-colors flex items-center justify-center gap-1" data-path="cong-vao-thi" href="#">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+              Về Cổng Vào Thi (Trang Chủ)
+            </a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div></main><footer class="w-full bg-surface-container-low py-space-lg"><div class="w-full px-gutter flex flex-col md:flex-row items-center justify-between gap-space-md text-on-surface-variant font-body-sm text-body-sm"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-primary text-[20px]">verified_user</span><span>Bản quyền © 2025 EduExam Pro. Hệ thống chuẩn hóa khảo thí THCS Bộ GD&amp;ĐT.</span></div><div class="flex items-center gap-space-lg font-label-md text-label-md"><span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-on-tertiary-container text-[16px]">shield</span>Bảo Mật Cấp 3</span><span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px]">timer</span>Đồng Hồ Chuẩn NTP</span><span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px]">school</span>Khối Lớp 6 • 7 • 8 • 9</span></div></div></footer></body></html>

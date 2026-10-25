@@ -1,0 +1,6 @@
+{
+  "name": "EduExam Pro - Hệ Thống Thi Trực Tuyến & Khảo Thí THCS",
+  "description": "Nền tảng kiểm định chất lượng giáo dục, thi trực tuyến và giám sát chống gian lận AI dành cho học sinh Trung học Cơ sở (Khối 6-9).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

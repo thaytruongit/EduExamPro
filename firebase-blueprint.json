@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "ExamBankItem": {
+      "title": "ExamBankItem",
+      "description": "Structured exam paper stored in the cloud exam bank for grades 6-9",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "grade": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "questionsJson": { "type": "string" },
+        "fillQuestionJson": { "type": "string" },
+        "shortQuestionJson": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "code", "title", "subject", "grade", "durationMinutes", "questionsJson", "createdAt"]
+    },
+    "StudentSubmission": {
+      "title": "StudentSubmission",
+      "description": "Completed exam submission and score record for a student in a class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sbd": { "type": "string" },
+        "name": { "type": "string" },
+        "grade": { "type": "number" },
+        "className": { "type": "string" },
+        "examId": { "type": "string" },
+        "examTitle": { "type": "string" },
+        "duration": { "type": "string" },
+        "durationSeconds": { "type": "number" },
+        "tabLeaves": { "type": "number" },
+        "reEntryCount": { "type": "number" },
+        "warningText": { "type": "string" },
+        "warningType": { "type": "string" },
+        "rawScore": { "type": "number" },
+        "penaltyScore": { "type": "number" },
+        "penaltyText": { "type": "string" },
+        "finalScore": { "type": "number" },
+        "rank": { "type": "string" },
+        "status": { "type": "string" },
+        "answersJson": { "type": "string" },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["id", "sbd", "name", "grade", "className", "durationSeconds", "tabLeaves", "rawScore", "finalScore", "status", "submittedAt"]
+    },
+    "ActiveExamSession": {
+      "title": "ActiveExamSession",
+      "description": "Real-time exam session state preserving remaining time, answers, and re-entry penalties when kicked out due to tab switch",
+      "type": "object",
+      "properties": {
+        "sessionKey": { "type": "string" },
+        "sbd": { "type": "string" },
+        "fullName": { "type": "string" },
+        "grade": { "type": "number" },
+        "studentClass": { "type": "string" },
+        "examId": { "type": "string" },
+        "remainingSeconds": { "type": "number" },
+        "tabViolations": { "type": "number" },
+        "kickedOutAt": { "type": "string" },
+        "isKickedOut": { "type": "boolean" },
+        "answersJson": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["sessionKey", "sbd", "fullName", "grade", "studentClass", "remainingSeconds", "tabViolations", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/ExamBankItem" },
+      "description": "Cloud exam bank for grades 6 to 9"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/StudentSubmission" },
+      "description": "Student exam submissions and class scoreboards"
+    },
+    "/examSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/ActiveExamSession" },
+      "description": "Saved active/paused student exam sessions for tab-switch kickout and re-entry"
+    }
+  }
+}
