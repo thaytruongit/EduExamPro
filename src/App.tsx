@@ -66,14 +66,16 @@ export default function App() {
   // Student registration state with Subject selection
   const [registration, setRegistration] = useState<StudentRegistration>({
     grade: 9,
-    studentClass: '9A1',
+    studentClass: '',
     selectedSubject: 'Tin',
-    sbd: '9A1-TIN',
+    sbd: '',
     fullName: '',
     dateOfBirth: '',
     studentUsername: '',
     honorCommitted: true,
   });
+
+  const [shortAnswerFeedback, setShortAnswerFeedback] = useState<string>('');
 
   // Initial subject exams for all 11 subjects across all 4 grades (6, 7, 8, 9)
   const initialSubjectExams = useMemo(() => getInitialSubjectExams(), []);
@@ -107,7 +109,7 @@ export default function App() {
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<number, 'A' | 'B' | 'C' | 'D'>
   >({});
-  const [fillBlanks, setFillBlanks] = useState<[string, string, string]>([
+  const [fillBlanks, setFillBlanks] = useState<string[]>([
     '',
     '',
     '',
@@ -200,7 +202,7 @@ export default function App() {
               const parsed = JSON.parse(
                 data.classroomsJson
               ) as ClassroomRecord[];
-              if (Array.isArray(parsed) && parsed.length > 0) {
+              if (Array.isArray(parsed)) {
                 setClassrooms(parsed);
               }
             } catch (e) {
@@ -213,7 +215,7 @@ export default function App() {
         handleFirestoreError(err, OperationType.GET, 'adminConfig/classrooms')
     );
 
-    // Listen to Student Accounts in Firestore (merge with default accounts across Grades 6, 7, 8, 9)
+    // Listen to Student Accounts in Firestore
     const unsubStudents = onSnapshot(
       doc(db, 'adminConfig', 'studentAccounts'),
       (snap) => {
@@ -222,13 +224,8 @@ export default function App() {
           if (data?.accountsJson && typeof data.accountsJson === 'string') {
             try {
               const parsed = JSON.parse(data.accountsJson) as StudentAccount[];
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                const byUser = new Map<string, StudentAccount>();
-                DEFAULT_STUDENT_ACCOUNTS.forEach((s) =>
-                  byUser.set(s.username.toLowerCase(), s)
-                );
-                parsed.forEach((s) => byUser.set(s.username.toLowerCase(), s));
-                setStudentAccounts(Array.from(byUser.values()));
+              if (Array.isArray(parsed)) {
+                setStudentAccounts(parsed);
               }
             } catch (e) {
               console.error('Error parsing student accounts:', e);
@@ -586,13 +583,12 @@ export default function App() {
     }));
   };
 
-  const handleChangeFillBlank = (index: 0 | 1 | 2, value: string) => {
+  const handleChangeFillBlank = (index: number, value: string) => {
     setFillBlanks((prev) => {
-      const next: [string, string, string] = [...prev] as [
-        string,
-        string,
-        string,
-      ];
+      const next = [...prev];
+      while (next.length <= index) {
+        next.push('');
+      }
       next[index] = value;
       return next;
     });
@@ -605,10 +601,15 @@ export default function App() {
       setSelectedExamId(examOverride.id);
     }
     const initialSecs = (targetExam.durationMinutes || 45) * 60;
+    const blankCount = Math.max(
+      1,
+      targetExam.fillQuestion?.blanks?.length || 3
+    );
     setRemainingSeconds(initialSecs);
     setSelectedAnswers({});
-    setFillBlanks(['', '', '']);
+    setFillBlanks(Array(blankCount).fill(''));
     setShortAnswer('');
+    setShortAnswerFeedback('');
     setTabViolations(0);
     setInterruptedSession(null);
     setHasCompletedCurrentExam(false);
@@ -623,8 +624,17 @@ export default function App() {
   const handleTabSwitchKickOut = async (currentRemainingSeconds: number) => {
     const nextViolations = tabViolations + 1;
     const nowTimeStr = new Date().toLocaleTimeString('vi-VN');
-    const isFillDone = fillBlanks.every((b) => b.trim().length > 0) ? 1 : 0;
-    const isShortDone = shortAnswer.trim().length > 0 ? 1 : 0;
+    const hasFill =
+      Boolean(activeExam.fillQuestion?.promptTemplate?.trim()) &&
+      Number(activeExam.fillQuestion?.points) > 0;
+    const hasShort =
+      Boolean(activeExam.shortQuestion?.prompt?.trim()) &&
+      Number(activeExam.shortQuestion?.points) > 0;
+    const isFillDone =
+      hasFill && fillBlanks.length > 0 && fillBlanks.every((b) => b.trim().length > 0)
+        ? 1
+        : 0;
+    const isShortDone = hasShort && shortAnswer.trim().length > 0 ? 1 : 0;
     const answeredCount =
       Object.keys(selectedAnswers).length + isFillDone + isShortDone;
 
@@ -697,6 +707,49 @@ export default function App() {
       totalPossibleSecs - finalRemainingSeconds
     );
 
+    // Call AI short-answer grading service if question exists and student submitted text
+    let aiShortScore: number | undefined = undefined;
+    let aiFeedback = '';
+    let aiGradedBy: string | undefined = undefined;
+
+    const shortQuest = activeExam.shortQuestion;
+    const hasShortSection =
+      Boolean(shortQuest?.prompt?.trim()) && Number(shortQuest?.points) > 0;
+    if (hasShortSection && shortQuest && shortAnswer.trim()) {
+      try {
+        const resp = await fetch('/api/grade-short-answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: shortQuest.prompt,
+            requirement: shortQuest.requirement,
+            keywords: shortQuest.keywords,
+            sampleAnswer: shortQuest.sampleAnswer,
+            studentAnswer: shortAnswer.trim(),
+            maxPoints: shortQuest.points || 3.0,
+          }),
+        });
+        if (resp.ok) {
+          const graded = await resp.json();
+          if (typeof graded.score === 'number') {
+            aiShortScore = graded.score;
+          }
+          if (graded.feedback) {
+            aiFeedback = graded.feedback;
+          }
+          if (graded.gradedBy) {
+            aiGradedBy = graded.gradedBy;
+          }
+        }
+      } catch (err) {
+        console.warn('AI evaluation service unreachable, fallback to local scoring:', err);
+      }
+    } else if (hasShortSection && shortQuest && !shortAnswer.trim()) {
+      aiFeedback = 'Thí sinh không làm câu tự luận ngắn (bỏ trống).';
+    }
+
+    setShortAnswerFeedback(aiFeedback);
+
     const evaluated = evaluateStudentSubmission({
       exam: activeExam,
       selectedAnswers,
@@ -704,6 +757,7 @@ export default function App() {
       shortAnswer,
       tabViolations,
       durationSeconds,
+      overrideShortAnswerScore: aiShortScore,
     });
 
     setExamScoreState({
@@ -794,6 +848,9 @@ export default function App() {
         finalScore: evaluated.finalScore,
         rank: evaluated.rank,
         status,
+        shortAnswerScore: evaluated.shortAnswerScore,
+        shortAnswerFeedback: aiFeedback,
+        shortAnswerGradedBy: aiGradedBy || 'local-rule',
         answersJson: JSON.stringify({
           selectedAnswers,
           fillBlanks,
@@ -1135,6 +1192,7 @@ export default function App() {
             selectedAnswers={selectedAnswers}
             fillBlanks={fillBlanks}
             shortAnswer={shortAnswer}
+            shortAnswerFeedback={shortAnswerFeedback}
             rawScore={examScoreState.rawScore}
             tabPenalty={examScoreState.tabPenalty}
             finalScore={examScoreState.finalScore}

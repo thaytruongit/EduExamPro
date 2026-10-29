@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   checkExamScheduleStatus,
   ExamBankData,
@@ -75,6 +75,53 @@ export const RegistrationPortal: React.FC<RegistrationPortalProps> = ({
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [showRosterHint, setShowRosterHint] = useState<boolean>(true);
+
+  // Student Account Lookup filter state (Khối, Lớp, Tìm kiếm)
+  const [lookupGrade, setLookupGrade] = useState<number | 'ALL'>('ALL');
+  const [lookupClass, setLookupClass] = useState<string>('ALL');
+  const [lookupSearch, setLookupSearch] = useState<string>('');
+
+  // Available classes derived from student accounts based on selected grade
+  const availableLookupClasses = useMemo(() => {
+    const classesSet = new Set<string>();
+    studentAccounts.forEach((stu) => {
+      if (lookupGrade === 'ALL' || stu.grade === lookupGrade) {
+        if (stu.studentClass) {
+          classesSet.add(stu.studentClass.trim().toUpperCase());
+        }
+      }
+    });
+    return Array.from(classesSet).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }, [studentAccounts, lookupGrade]);
+
+  // Filtered student accounts for lookup table
+  const filteredLookupAccounts = useMemo(() => {
+    return studentAccounts.filter((stu) => {
+      // 1. Filter by Grade
+      if (lookupGrade !== 'ALL' && stu.grade !== lookupGrade) {
+        return false;
+      }
+      // 2. Filter by Class
+      if (
+        lookupClass !== 'ALL' &&
+        stu.studentClass.trim().toUpperCase() !== lookupClass.trim().toUpperCase()
+      ) {
+        return false;
+      }
+      // 3. Search query
+      if (lookupSearch.trim()) {
+        const q = lookupSearch.trim().toLowerCase();
+        const nameMatch = stu.fullName.toLowerCase().includes(q);
+        const userMatch = stu.username.toLowerCase().includes(q);
+        const dobMatch = stu.dateOfBirth.toLowerCase().includes(q);
+        const classMatch = stu.studentClass.toLowerCase().includes(q);
+        return nameMatch || userMatch || dobMatch || classMatch;
+      }
+      return true;
+    });
+  }, [studentAccounts, lookupGrade, lookupClass, lookupSearch]);
 
   // Student Main Screen state
   const [activeStudentTab, setActiveStudentTab] =
@@ -400,57 +447,163 @@ export const RegistrationPortal: React.FC<RegistrationPortalProps> = ({
                     Danh Sách Tài Khoản Học Sinh Đã Cấp Theo Lớp Học
                   </span>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                    Tra Cứu Thông Tin Tài Khoản Học Sinh ({studentAccounts.length} học sinh)
+                    Tra Cứu Thông Tin Tài Khoản Học Sinh ({filteredLookupAccounts.length} / {studentAccounts.length} học sinh)
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowRosterHint((prev) => !prev)}
-                  className="px-3 py-1.5 rounded-lg bg-surface-container text-primary font-label-md text-xs font-bold cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-surface-container text-primary font-label-md text-xs font-bold cursor-pointer hover:bg-surface-container-high transition-colors"
                 >
                   {showRosterHint ? 'Thu gọn danh sách' : 'Hiển thị danh sách'}
                 </button>
               </div>
 
               {showRosterHint && (
-                <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-surface-container-highest/50 text-on-surface-variant font-label-md text-xs uppercase">
-                        <th className="py-2.5 px-3">Họ và Tên</th>
-                        <th className="py-2.5 px-3 text-center">Ngày Sinh</th>
-                        <th className="py-2.5 px-3 text-center">Lớp</th>
-                        <th className="py-2.5 px-3">Tài Khoản</th>
-                        <th className="py-2.5 px-3">Mật Khẩu</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant/20 font-body-sm text-xs">
-                      {studentAccounts.map((stu) => (
-                        <tr
-                          key={stu.id}
-                          className="hover:bg-surface-container-low transition-colors"
+                <div className="flex flex-col gap-3">
+                  {/* Grade & Class Selection Toolbar */}
+                  <div className="flex flex-col gap-2.5 bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
+                    {/* Grade Selector */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-code-meta text-xs font-bold text-on-surface-variant flex items-center gap-1 shrink-0">
+                        <span className="material-symbols-outlined text-[16px] text-primary">filter_alt</span>
+                        Chọn Khối:
+                      </span>
+                      {(['ALL', 6, 7, 8, 9] as const).map((g) => {
+                        const count =
+                          g === 'ALL'
+                            ? studentAccounts.length
+                            : studentAccounts.filter((s) => s.grade === g).length;
+                        return (
+                          <button
+                            key={String(g)}
+                            type="button"
+                            onClick={() => {
+                              setLookupGrade(g);
+                              setLookupClass('ALL');
+                            }}
+                            className={`px-2.5 py-1 rounded-lg font-code-meta text-xs font-bold cursor-pointer transition-all ${
+                              lookupGrade === g
+                                ? 'bg-primary text-on-primary shadow-xs'
+                                : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-high'
+                            }`}
+                          >
+                            {g === 'ALL' ? 'Tất cả khối' : `Khối ${g}`} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Class Selector & Search Input */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-outline-variant/15">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-code-meta text-xs font-bold text-on-surface-variant shrink-0">
+                          Chọn Lớp:
+                        </span>
+                        <select
+                          aria-label="Chọn lớp học"
+                          value={lookupClass}
+                          onChange={(e) => setLookupClass(e.target.value)}
+                          className="px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-xs font-code-meta font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                         >
-                          <td className="py-2.5 px-3 font-semibold text-on-surface">
-                            {stu.fullName}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-code-meta text-on-surface-variant">
-                            {stu.dateOfBirth}
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            <span className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-code-meta font-bold">
-                              {stu.studentClass}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 font-code-meta font-bold text-primary">
-                            {stu.username}
-                          </td>
-                          <td className="py-2.5 px-3 font-code-meta text-secondary font-bold">
-                            {stu.password}
-                          </td>
+                          <option value="ALL">
+                            Tất cả lớp {lookupGrade !== 'ALL' ? `Khối ${lookupGrade}` : ''} ({lookupGrade === 'ALL' ? studentAccounts.length : studentAccounts.filter((s) => s.grade === lookupGrade).length} học sinh)
+                          </option>
+                          {availableLookupClasses.map((clsName) => {
+                            const clsCount = studentAccounts.filter(
+                              (s) =>
+                                (lookupGrade === 'ALL' || s.grade === lookupGrade) &&
+                                s.studentClass.toUpperCase() === clsName
+                            ).length;
+                            return (
+                              <option key={clsName} value={clsName}>
+                                Lớp {clsName} ({clsCount} học sinh)
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      <div className="relative min-w-[200px] flex-1 max-w-xs">
+                        <input
+                          type="text"
+                          aria-label="Tìm kiếm tài khoản học sinh"
+                          value={lookupSearch}
+                          onChange={(e) => setLookupSearch(e.target.value)}
+                          placeholder="Tìm tên, lớp, tài khoản..."
+                          className="w-full pl-8 pr-3 py-1 rounded-lg bg-surface-container-lowest text-xs text-on-surface border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary font-code-meta"
+                        />
+                        <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
+                          search
+                        </span>
+                        {lookupSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setLookupSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface text-xs font-bold cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Student Accounts Table with STICKY HEADER */}
+                  <div className="overflow-x-auto max-h-[380px] overflow-y-auto relative rounded-xl border border-outline-variant/20 shadow-inner">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 z-10 bg-surface-container-high shadow-xs">
+                        <tr className="text-on-surface font-label-md text-xs uppercase font-bold border-b border-outline-variant/30">
+                          <th className="py-2.5 px-3 text-center bg-surface-container-high">STT</th>
+                          <th className="py-2.5 px-3 bg-surface-container-high">Họ và Tên</th>
+                          <th className="py-2.5 px-3 text-center bg-surface-container-high">Ngày Sinh</th>
+                          <th className="py-2.5 px-3 text-center bg-surface-container-high">Lớp</th>
+                          <th className="py-2.5 px-3 bg-surface-container-high">Tài Khoản</th>
+                          <th className="py-2.5 px-3 bg-surface-container-high">Mật Khẩu</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/20 font-body-sm text-xs bg-surface-container-lowest">
+                        {filteredLookupAccounts.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={6}
+                              className="py-8 text-center text-on-surface-variant font-code-meta"
+                            >
+                              Không tìm thấy tài khoản học sinh phù hợp với bộ lọc ({lookupGrade !== 'ALL' ? `Khối ${lookupGrade}` : ''} {lookupClass !== 'ALL' ? `Lớp ${lookupClass}` : ''}).
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredLookupAccounts.map((stu, idx) => (
+                            <tr
+                              key={stu.id}
+                              className="hover:bg-surface-container-low transition-colors"
+                            >
+                              <td className="py-2.5 px-3 text-center font-code-meta text-on-surface-variant font-semibold">
+                                {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                              </td>
+                              <td className="py-2.5 px-3 font-semibold text-on-surface">
+                                {stu.fullName}
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-code-meta text-on-surface-variant">
+                                {stu.dateOfBirth}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-code-meta font-bold">
+                                  {stu.studentClass}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-code-meta font-bold text-primary">
+                                {stu.username}
+                              </td>
+                              <td className="py-2.5 px-3 font-code-meta text-secondary font-bold">
+                                {stu.password}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -738,9 +891,24 @@ export const RegistrationPortal: React.FC<RegistrationPortalProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setActiveStudentTab('chon-mon-thi');
                           handleSelectSubject(subjKey);
                           onSelectExamId(item.exam.id);
+                          if (isUpcoming) {
+                            setActiveStudentTab('chon-mon-thi');
+                          } else {
+                            if (!registration.honorCommitted) {
+                              onUpdateRegistration({
+                                ...registration,
+                                selectedSubject: subjKey,
+                                honorCommitted: true,
+                              });
+                            }
+                            if (interruptedSession) {
+                              onResumeInterruptedExam();
+                            } else {
+                              onStartExam(item.exam);
+                            }
+                          }
                         }}
                         className="px-2.5 py-1 rounded-lg bg-primary text-on-primary font-label-md text-[11px] font-bold cursor-pointer hover:bg-primary-container shrink-0"
                       >

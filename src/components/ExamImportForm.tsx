@@ -6,6 +6,7 @@ import {
   ExamBankData,
   ExamScheduleParts,
   examToStandardTemplateText,
+  extractTextFromDocxArrayBuffer,
   extractTextFromDocxOrPdfRaw,
   formatExamScheduleWindow,
   formatSchedulePartsDisplay,
@@ -16,10 +17,10 @@ import {
   mixExamFromQuestionBank,
   MultipleChoiceOption,
   normalizeSubjectKey,
-  parseFreeformExamContent,
   parseIsoToScheduleParts,
   parseStandardExamText,
   removeExamQuestionDirectly,
+  scanAndParseThreeExamSections,
   shuffleExamQuestionsAndOptions,
   SubjectKey,
   TeacherAccount,
@@ -27,7 +28,6 @@ import {
   updateExamQuestionDirectly,
   ClassroomRecord,
 } from '../utils/examLogic';
-import { ExamPrintView } from './ExamPrintView';
 
 interface ExamImportFormProps {
   cloudExams: ExamBankData[];
@@ -99,7 +99,7 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
     };
   });
 
-  // Target classes for exam assignment (e.g., ['7A1'] when teacher assigns exam to 7A1)
+  // Target classes for exam assignment (strictly from managed classrooms or teacher assignment)
   const [assignedClasses, setAssignedClasses] = useState<string[]>(() => {
     if (
       Array.isArray(currentTeacher.assignedClasses) &&
@@ -107,8 +107,11 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
     ) {
       return currentTeacher.assignedClasses;
     }
-    return ['9A1', '9A2'];
+    const matching = classrooms.filter((c) => c.grade === 9).map((c) => c.name.toUpperCase());
+    return matching.length > 0 ? matching : [];
   });
+
+  const [ingestionError, setIngestionError] = useState<string | null>(null);
 
   // Track which question index (0-based) is focused in Direct Question Editor
   const [editingQuestionIdx, setEditingQuestionIdx] = useState<number>(0);
@@ -126,21 +129,10 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
   );
 
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [showInlinePrintPreview, setShowInlinePrintPreview] =
-    useState<boolean>(true);
-  const [showFullModalPreview, setShowFullModalPreview] =
-    useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isProcessingDoc, setIsProcessingDoc] = useState<boolean>(false);
-
-  // Freeform vs Standard exam import mode
-  const [importFormatMode, setImportFormatMode] = useState<
-    'freeform' | 'standard'
-  >('freeform');
-  const [freeformCustomTitle, setFreeformCustomTitle] = useState<string>('');
-  const [freeformCustomCode, setFreeformCustomCode] = useState<string>('');
 
   // Ingestion Progress Modal state
   const [ingestionModalOpen, setIngestionModalOpen] = useState<boolean>(false);
@@ -164,9 +156,10 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
   const runIngestionProgressSequence = async (
     rawContent: string,
     sourceLabel: string,
-    autoSaveToCloud: boolean = true
+    autoSaveToCloud: boolean = false
   ) => {
     setValidationError(null);
+    setIngestionError(null);
     setPurgeDemoSuccessMsg(null);
     setIngestionCompletedExam(null);
     setIngestionWarnings([]);
@@ -174,80 +167,75 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
     setIngestionPercent(15);
     setIngestionStepIndex(1);
     setIngestionStepText(
-      `Bước 1/4: Đang đọc nguồn dữ liệu "${sourceLabel}" (${
-        importFormatMode === 'freeform'
-          ? 'Chế độ Nạp Đề Tự Do - Không theo khung chuẩn'
-          : 'Chế độ Khung Chuẩn DOCX/PDF'
-      })...`
+      `Bước 1/5: Đang đọc và giải nén cấu trúc OCR tài liệu "${sourceLabel}"...`
     );
 
-    await new Promise((r) => setTimeout(r, 120));
-    setIngestionPercent(50);
+    await new Promise((r) => setTimeout(r, 140));
+    setIngestionPercent(35);
     setIngestionStepIndex(2);
     setIngestionStepText(
-      `Bước 2/4: Đang bóc tách câu hỏi trắc nghiệm, phương án A/B/C/D và tự luận cho môn ${selectedSubject} Khối ${selectedGrade}...`
+      `Bước 2/5: Thuật toán tối ưu nhận diện cấu trúc câu hỏi: Trắc nghiệm, Điền khuyết, Trả lời ngắn, Tự luận...`
     );
 
-    let parsedExam: ExamBankData;
-    let warningsList: string[] = [];
+    await new Promise((r) => setTimeout(r, 160));
+    setIngestionPercent(60);
+    setIngestionStepIndex(3);
+    setIngestionStepText(
+      `Bước 3/5: Quét loại câu hỏi thực tế trong đề (quét được loại nào dùng loại đó làm đề)...`
+    );
 
-    if (importFormatMode === 'freeform') {
-      const freeformRes = parseFreeformExamContent(rawContent, {
-        grade: selectedGrade,
-        subject: selectedSubject,
-        customCode: freeformCustomCode.trim() || undefined,
-        customTitle: freeformCustomTitle.trim() || undefined,
+    await new Promise((r) => setTimeout(r, 160));
+    setIngestionPercent(80);
+    setIngestionStepIndex(4);
+    setIngestionStepText(
+      `Bước 4/5: Quét bảng Đáp án & Hướng dẫn chấm có sẵn trong đề nạp...`
+    );
+
+    const scanResult = scanAndParseThreeExamSections(
+      rawContent,
+      selectedGrade,
+      selectedSubject,
+      {
         durationMinutes: previewExam.durationMinutes || 45,
         createdBy: currentTeacher.fullName || adminUserLabel,
         teacherId: currentTeacher.id,
         teacherUsername: currentTeacher.username,
         teacherName: currentTeacher.fullName || adminUserLabel,
-      });
-      parsedExam = freeformRes.exam;
-      warningsList = freeformRes.warnings;
-    } else {
-      const stdParsed = parseStandardExamText(
-        rawContent,
-        selectedGrade,
-        selectedSubject
+      }
+    );
+
+    if (!scanResult.ok) {
+      setIngestionError(
+        scanResult.error || 'Quá trình quét đề thi không thành công.'
       );
-      parsedExam = {
-        ...stdParsed,
-        grade: selectedGrade,
-        subject: selectedSubject,
-        subjectCode: selectedSubject,
-        code: freeformCustomCode.trim() || stdParsed.code,
-        title: freeformCustomTitle.trim() || stdParsed.title,
-      };
+      setIngestionPercent(100);
+      return;
     }
 
-    await new Promise((r) => setTimeout(r, 120));
-    setIngestionPercent(82);
-    setIngestionStepIndex(3);
-    setIngestionStepText(
-      `Bước 3/4: Kiểm định thang điểm (${parsedExam.questions.length} câu TN + 2 câu TL) & đồng bộ Ngân hàng đề Cloud...`
+    const detectedGrade = scanResult.exam.grade || selectedGrade;
+    const detectedSubject = normalizeSubjectKey(
+      scanResult.exam.subjectCode || scanResult.exam.subject || selectedSubject
     );
+    setSelectedGrade(detectedGrade);
+    setSelectedSubject(detectedSubject);
 
     const startIso = buildIsoFromScheduleParts(startSchedule);
     const endIso = buildIsoFromScheduleParts(endSchedule);
+    const availableForGrade = classrooms
+      .filter((c) => c.grade === detectedGrade)
+      .map((c) => c.name.toUpperCase());
     const effectiveClasses =
-      assignedClasses.length > 0 ? assignedClasses : [`${selectedGrade}A1`];
+      assignedClasses.length > 0 ? assignedClasses : availableForGrade;
 
     const finalExamToSave: ExamBankData = {
-      ...parsedExam,
-      grade: selectedGrade,
-      subject: selectedSubject,
-      subjectCode: selectedSubject,
-      createdAt: new Date().toISOString(),
-      createdBy: currentTeacher.fullName || adminUserLabel,
-      teacherId: currentTeacher.id,
-      teacherUsername: currentTeacher.username,
-      teacherName: currentTeacher.fullName || adminUserLabel,
+      ...scanResult.exam,
+      grade: detectedGrade,
+      subject: detectedSubject,
+      subjectCode: detectedSubject,
       assignedClasses: effectiveClasses,
-      isActive: true,
-      isAssigned: true,
       startAt: startIso,
       endAt: endIso,
+      isAssigned: effectiveClasses.length > 0,
     };
 
     setPreviewExam(finalExamToSave);
@@ -257,16 +245,39 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
       await onSaveExamToCloud(finalExamToSave);
     }
 
-    await new Promise((r) => setTimeout(r, 100));
+    const activeSectionLabels: string[] = [];
+    if (finalExamToSave.questions.length > 0) {
+      activeSectionLabels.push(
+        `${finalExamToSave.questions.length} câu trắc nghiệm`
+      );
+    }
+    if (
+      finalExamToSave.fillQuestion.points > 0 &&
+      finalExamToSave.fillQuestion.promptTemplate.trim()
+    ) {
+      activeSectionLabels.push(
+        `1 bài điền khuyết (${finalExamToSave.fillQuestion.blanks.length} vị trí)`
+      );
+    }
+    if (
+      finalExamToSave.shortQuestion.points > 0 &&
+      finalExamToSave.shortQuestion.prompt.trim()
+    ) {
+      activeSectionLabels.push('1 bài tự luận / trả lời ngắn');
+    }
+
+    await new Promise((r) => setTimeout(r, 120));
     setIngestionPercent(100);
-    setIngestionStepIndex(4);
+    setIngestionStepIndex(5);
     setIngestionStepText(
-      `Bước 4/4: Hoàn tất nạp đề "${finalExamToSave.title}" (${finalExamToSave.code}) lên hệ thống!`
+      `Bước 5/5: Hoàn tất quét cấu trúc & đáp án đề "${finalExamToSave.title}" (${finalExamToSave.code})!`
     );
     setIngestionCompletedExam(finalExamToSave);
-    setIngestionWarnings(warningsList);
+    setIngestionWarnings(scanResult.warnings);
     setStatusMessage(
-      `Đã nạp thành công đề "${finalExamToSave.title}" (${finalExamToSave.questions.length} câu TN + 2 câu TL) cho lớp ${effectiveClasses.join(', ')}.`
+      `Đã quét OCR thành công đề "${finalExamToSave.title}" (${activeSectionLabels.join(
+        ' + '
+      )}) kèm đáp án chuẩn!`
     );
   };
 
@@ -388,101 +399,51 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
     );
   };
 
-  // Export / Print to standard A4 PDF
-  const handleExportStandardPdf = () => {
-    setShowFullModalPreview(true);
-    setStatusMessage(
-      `Đã mở Bản In Đề Thi Chuẩn PDF (A4) cho mã đề ${previewExam.code}.`
-    );
-  };
-
-  // Upload .docx, .pdf, .doc, .txt file
+  // Upload .docx, .pdf, .doc, .txt file with local deterministic extraction (zero API key)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFileName(file.name);
     setValidationError(null);
+    setIngestionError(null);
     setIsProcessingDoc(true);
 
     try {
       const lowerName = file.name.toLowerCase();
-      const rawTextContent = await file.text();
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = String(reader.result || '');
-          const commaIdx = result.indexOf(',');
-          resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
-        };
-        reader.onerror = () => reject(new Error('Lỗi đọc tệp tải lên'));
-        reader.readAsDataURL(file);
-      });
+      let extractedText = '';
 
-      let serverExtractedText = '';
-      try {
-        const response = await fetch('/api/parse-exam', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rawText: extractTextFromDocxOrPdfRaw(rawTextContent),
-            fileBase64: base64Data,
-            mimeType:
-              file.type ||
-              (lowerName.endsWith('.pdf')
-                ? 'application/pdf'
-                : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
-            defaultGrade: selectedGrade,
-          }),
-        });
-        const data = await response.json();
-        if (
-          data &&
-          !data.usedFallback &&
-          data.exam &&
-          Array.isArray(data.exam.questions) &&
-          data.exam.questions.length > 0
-        ) {
-          const aiExam = parseStandardExamText(
-            JSON.stringify(data.exam),
-            selectedGrade,
-            selectedSubject
-          );
-          updateWorkingExam(
-            {
-              ...aiExam,
-              subject: selectedSubject,
-              subjectCode: selectedSubject,
-            },
-            true
-          );
-          setShowInlinePrintPreview(true);
-          setStatusMessage(
-            `Đã bóc tách thành công tài liệu "${file.name}" môn ${selectedSubject} Khối ${selectedGrade} (${aiExam.questions.length} câu TN + 2 câu TL)!`
-          );
-          return;
-        }
-        if (data?.extractedText && typeof data.extractedText === 'string') {
-          serverExtractedText = data.extractedText;
-        }
-      } catch {
-        // Fallback to local deterministic extraction
+      if (
+        lowerName.endsWith('.docx') ||
+        file.type.includes('wordprocessingml') ||
+        file.type.includes('docx')
+      ) {
+        const buffer = await file.arrayBuffer();
+        extractedText = await extractTextFromDocxArrayBuffer(buffer);
+      } else {
+        const textContent = await file.text();
+        extractedText = extractTextFromDocxOrPdfRaw(textContent);
       }
 
-      const effectiveRaw =
-        serverExtractedText.trim() ||
-        extractTextFromDocxOrPdfRaw(rawTextContent);
+      if (!extractedText.trim()) {
+        setIngestionModalOpen(true);
+        setIngestionError(
+          `Không thể trích xuất văn bản từ tệp "${file.name}". Vui lòng kiểm tra lại tệp DOCX/PDF hoặc chọn tệp khác.`
+        );
+        return;
+      }
 
-      setTextInput(effectiveRaw);
-      await runIngestionProgressSequence(effectiveRaw, file.name, true);
-      setShowInlinePrintPreview(true);
+      setTextInput(extractedText);
+      await runIngestionProgressSequence(extractedText, file.name, false);
     } catch (err) {
-      setValidationError(
-        `Không thể đọc tệp "${file.name}": ${
+      setIngestionModalOpen(true);
+      setIngestionError(
+        `Lỗi khi đọc tệp "${file.name}": ${
           err instanceof Error ? err.message : String(err)
         }`
       );
     } finally {
       setIsProcessingDoc(false);
+      e.target.value = '';
     }
   };
 
@@ -512,8 +473,11 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
               .toLowerCase()
               .replace(/[^a-z0-9-_]/g, '-')}-${Date.now()}`;
 
+      const availableForGrade = classrooms
+        .filter((c) => c.grade === selectedGrade)
+        .map((c) => c.name.toUpperCase());
       const effectiveClasses =
-        assignedClasses.length > 0 ? assignedClasses : [`${selectedGrade}A1`];
+        assignedClasses.length > 0 ? assignedClasses : availableForGrade;
 
       const examToAssign: ExamBankData = {
         ...previewExam,
@@ -757,46 +721,6 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
             </button>
           )}
 
-          {onRestoreSystemDemoExams &&
-            (purgedDemoExams || systemDemoExamsCount === 0) && (
-              <button
-                id="btnRestoreSystemDemoExams"
-                type="button"
-                onClick={onRestoreSystemDemoExams}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-label-md text-xs cursor-pointer whitespace-nowrap shrink-0"
-              >
-                <span className="material-symbols-outlined text-[16px]">
-                  restore
-                </span>
-                <span>Khôi phục đề mẫu hệ thống</span>
-              </button>
-            )}
-
-          <button
-            id="btnDownloadDocxSample"
-            type="button"
-            onClick={() => handleDownloadStandardDocx(previewExam)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary text-on-secondary hover:bg-secondary-container font-label-md text-label-md shadow-sm cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              download
-            </span>
-            <span>
-              Tải Đề Chuẩn (.DOCX) {selectedSubject} K{selectedGrade}
-            </span>
-          </button>
-
-          <button
-            id="btnExportPdfStandard"
-            type="button"
-            onClick={handleExportStandardPdf}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md shadow-sm cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              picture_as_pdf
-            </span>
-            <span>Xuất / In Đề Chuẩn (.PDF A4)</span>
-          </button>
         </div>
       </div>
 
@@ -960,16 +884,16 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg print:hidden">
         {/* LEFT COLUMN (7 cols): Active Workspace Mode + STEP 2 SCHEDULE & ASSIGN */}
         <div className="lg:col-span-7 bg-surface-container-lowest rounded-xl p-space-lg shadow-md flex flex-col gap-space-md">
-          {/* TAB 1: DOCX / PDF & FREEFORM IMPORT */}
+          {/* TAB 1: STRUCTURAL OCR QUESTION-TYPE & ANSWER-KEY SCANNER */}
           {activeTab === 'docx_pdf' && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-outline-variant/30">
                 <div>
                   <span className="font-code-meta text-code-meta text-secondary font-bold uppercase">
-                    Nạp Đề Trực Tiếp Môn {selectedSubject} • Khối {selectedGrade}
+                    Thuật Toán Tối Ưu Quét OCR Đúng Cấu Trúc Loại Câu Hỏi &amp; Đáp Án Có Sẵn • Môn {selectedSubject} • Khối {selectedGrade}
                   </span>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                    Tuỳ Chọn Nạp Đề Tự Do (Không Theo Khung Chuẩn) Hoặc Theo Khung Chuẩn
+                    Tự Động Nhận Diện: Trắc Nghiệm • Điền Khuyết • Trả Lời Ngắn • Tự Luận (Quét Được Loại Nào Dùng Loại Đó Làm Đề)
                   </h3>
                 </div>
                 <span className="px-2.5 py-1 rounded bg-secondary-fixed text-on-secondary-fixed font-code-meta text-xs font-bold">
@@ -977,119 +901,17 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                 </span>
               </div>
 
-              {/* Format Mode Selector: Freeform (Tự do không theo khung chuẩn) vs Standard */}
-              <div
-                id="exam-import-mode-selector"
-                className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-surface-container-low p-2.5 rounded-xl border border-outline-variant/30"
-              >
-                <button
-                  id="btnModeFreeformExam"
-                  type="button"
-                  onClick={() => setImportFormatMode('freeform')}
-                  className={`p-3 rounded-lg text-left flex items-start gap-2.5 cursor-pointer transition-all border ${
-                    importFormatMode === 'freeform'
-                      ? 'bg-primary text-on-primary border-primary shadow-sm'
-                      : 'bg-surface-container-lowest text-on-surface border-outline-variant/20 hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px] mt-0.5">
-                    bolt
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="font-label-lg text-xs font-bold">
-                      Chế Độ Nạp Đề Tự Do (Không Theo Khung Chuẩn)
-                    </span>
-                    <span
-                      className={`text-[11px] ${
-                        importFormatMode === 'freeform'
-                          ? 'text-on-primary/90'
-                          : 'text-on-surface-variant'
-                      }`}
-                    >
-                      Dán bất kỳ câu hỏi, đoạn văn bản hoặc tệp Word/PDF tự do, hệ thống tự động nhận diện câu hỏi &amp; phương án
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  id="btnModeStandardExam"
-                  type="button"
-                  onClick={() => setImportFormatMode('standard')}
-                  className={`p-3 rounded-lg text-left flex items-start gap-2.5 cursor-pointer transition-all border ${
-                    importFormatMode === 'standard'
-                      ? 'bg-primary text-on-primary border-primary shadow-sm'
-                      : 'bg-surface-container-lowest text-on-surface border-outline-variant/20 hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px] mt-0.5">
-                    fact_check
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="font-label-lg text-xs font-bold">
-                      Chế Độ Nạp Theo Khung Chuẩn EduExam
-                    </span>
-                    <span
-                      className={`text-[11px] ${
-                        importFormatMode === 'standard'
-                          ? 'text-on-primary/90'
-                          : 'text-on-surface-variant'
-                      }`}
-                    >
-                      Định dạng chuẩn gồm 3 phần: Trắc nghiệm khách quan, Điền khuyết và Tự luận ngắn
-                    </span>
-                  </div>
-                </button>
-              </div>
-
-              {/* Optional custom Title & Code for Freeform / Quick Import */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 bg-surface-container-low p-3 rounded-xl">
-                <div className="sm:col-span-7 flex flex-col gap-1">
-                  <label
-                    htmlFor="inputFreeformExamTitle"
-                    className="font-code-meta text-[11px] text-on-surface-variant font-bold"
-                  >
-                    Tên đề kiểm tra (Tuỳ chọn đặt tên nhanh khi nạp tự do):
-                  </label>
-                  <input
-                    id="inputFreeformExamTitle"
-                    type="text"
-                    value={freeformCustomTitle}
-                    onChange={(e) => setFreeformCustomTitle(e.target.value)}
-                    placeholder={`VD: Đề kiểm tra 15 phút môn ${selectedSubject} Khối ${selectedGrade}...`}
-                    className="px-3 py-1.5 rounded-lg bg-surface-container-lowest text-xs font-semibold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div className="sm:col-span-5 flex flex-col gap-1">
-                  <label
-                    htmlFor="inputFreeformExamCode"
-                    className="font-code-meta text-[11px] text-on-surface-variant font-bold"
-                  >
-                    Mã đề tuỳ chọn:
-                  </label>
-                  <input
-                    id="inputFreeformExamCode"
-                    type="text"
-                    value={freeformCustomCode}
-                    onChange={(e) => setFreeformCustomCode(e.target.value)}
-                    placeholder={`VD: ${getSubjectMeta(selectedSubject).codePrefix}-${selectedGrade}-TUDO01`}
-                    className="px-3 py-1.5 rounded-lg bg-surface-container-lowest font-code-meta text-xs font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Upload DOCX / PDF Bar + Trigger Progress Window */}
+              {/* Upload DOCX / PDF Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low p-space-md rounded-xl border border-dashed border-outline-variant">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-lg bg-primary-fixed text-primary flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[22px]">
-                      description
+                      document_scanner
                     </span>
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="font-label-lg text-label-lg text-on-surface font-semibold truncate">
-                      {importFormatMode === 'freeform'
-                        ? `Nạp tệp đề thi tự do (.DOCX, .PDF, .TXT, .JSON) môn ${selectedSubject} Khối ${selectedGrade}`
-                        : `Tải lên tệp đề thi chuẩn (.DOCX, .PDF, .DOC) môn ${selectedSubject} Khối ${selectedGrade}`}
+                      Tải tệp đề thi (.DOCX, .PDF, .DOC, .TXT) — Tự động quét cấu trúc câu hỏi &amp; bảng đáp án trong đề
                     </span>
                     <span className="font-code-meta text-code-meta text-on-surface-variant truncate">
                       Tệp đang nạp: <strong>{uploadedFileName}</strong>
@@ -1111,86 +933,30 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                     type="button"
                     disabled={isProcessingDoc}
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3.5 py-2 rounded-lg bg-surface-container-highest text-on-surface hover:bg-primary hover:text-on-primary font-label-md text-label-md shadow-sm cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+                    className="px-4 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-bold shadow-sm cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <span className="material-symbols-outlined text-[16px]">
                       folder_open
                     </span>
                     <span>
                       {isProcessingDoc
-                        ? 'Đang bóc tách tệp...'
-                        : 'Chọn tệp (.DOCX / .PDF / .TXT)'}
+                        ? 'Đang quét OCR cấu trúc đề...'
+                        : 'Chọn tệp đề thi (.DOCX / .PDF / .TXT)'}
                     </span>
-                  </button>
-
-                  <button
-                    id="btnRunExamIngestionWithProgress"
-                    type="button"
-                    onClick={() =>
-                      runIngestionProgressSequence(
-                        textInput,
-                        uploadedFileName || 'Nội dung soạn trực tiếp',
-                        true
-                      )
-                    }
-                    className="px-4 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-bold shadow-md cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      rocket_launch
-                    </span>
-                    <span>Thực Hiện Nạp Đề (Cửa Sổ Tiến Trình)</span>
                   </button>
                 </div>
               </div>
 
-              {/* Content Editor (Supports both Freeform and Standard) */}
+              {/* Content Editor */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-xs text-on-surface-variant flex-wrap gap-2">
                   <label
                     htmlFor="examImportEditorTextarea"
                     className="font-semibold text-on-surface"
                   >
-                    {importFormatMode === 'freeform'
-                      ? `Nội dung đề thi tự do (Không bắt buộc khung chuẩn - Môn ${selectedSubject} Khối ${selectedGrade}):`
-                      : `Nội dung đề thi theo khung chuẩn (Môn ${selectedSubject} - Khối ${selectedGrade}):`}
+                    Nội dung đề thi &amp; bảng đáp án quét OCR (Tự động bóc tách Trắc nghiệm, Điền khuyết, Trả lời ngắn, Tự luận và Đáp án có sẵn):
                   </label>
                   <div className="flex items-center gap-3">
-                    {importFormatMode === 'freeform' && (
-                      <button
-                        id="btnLoadSampleFreeformText"
-                        type="button"
-                        onClick={() => {
-                          const sampleFreeform = [
-                            `Câu 1: Thiết bị nào sau đây là thiết bị xử lý trung tâm của máy tính?`,
-                            `*A. CPU (Bộ xử lý trung tâm)`,
-                            `B. Màn hình hiển thị`,
-                            `C. Bàn phím cơ học`,
-                            `D. Chuột quang học`,
-                            `Câu 2: Hệ nhị phân sử dụng những chữ số nào để biểu diễn dữ liệu? A. 0 và 1 B. 1 và 2 C. 0 đến 9 D. A đến F`,
-                            `Đáp án: A`,
-                            `Câu 3: Phần mềm nào sau đây là hệ điều hành máy tính?`,
-                            `A. Microsoft Word`,
-                            `*B. Windows 11`,
-                            `C. Google Chrome`,
-                            `D. Adobe Photoshop`,
-                          ].join('\n');
-                          setTextInput(sampleFreeform);
-                          const res = parseFreeformExamContent(sampleFreeform, {
-                            grade: selectedGrade,
-                            subject: selectedSubject,
-                            customCode: freeformCustomCode || undefined,
-                            customTitle: freeformCustomTitle || undefined,
-                          });
-                          setPreviewExam(res.exam);
-                        }}
-                        className="font-code-meta text-secondary hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          auto_fix_high
-                        </span>
-                        Dán mẫu đề tự do nhanh
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => setActiveTab('direct_edit')}
@@ -1211,34 +977,24 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                   onChange={(e) => {
                     const nextVal = e.target.value;
                     setTextInput(nextVal);
-                    if (importFormatMode === 'freeform') {
-                      const res = parseFreeformExamContent(nextVal, {
-                        grade: selectedGrade,
-                        subject: selectedSubject,
-                        customCode: freeformCustomCode.trim() || undefined,
-                        customTitle: freeformCustomTitle.trim() || undefined,
+                    const scanRes = scanAndParseThreeExamSections(
+                      nextVal,
+                      selectedGrade,
+                      selectedSubject,
+                      {
+                        durationMinutes: previewExam.durationMinutes || 45,
                         createdBy: currentTeacher.fullName || adminUserLabel,
                         teacherId: currentTeacher.id,
                         teacherUsername: currentTeacher.username,
                         teacherName: currentTeacher.fullName || adminUserLabel,
-                      });
-                      setPreviewExam(res.exam);
-                    } else {
-                      const parsed = parseStandardExamText(
-                        nextVal,
-                        selectedGrade,
-                        selectedSubject
-                      );
-                      setPreviewExam({
-                        ...parsed,
-                        grade: selectedGrade,
-                        subject: selectedSubject,
-                        subjectCode: selectedSubject,
-                      });
+                      }
+                    );
+                    if (scanRes.ok) {
+                      setPreviewExam(scanRes.exam);
                     }
                   }}
                   className="w-full p-space-md rounded-xl bg-surface-container-low font-code-meta text-xs text-on-surface leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Dán nội dung câu hỏi tự do (không cần khung chuẩn) hoặc tải lên tệp .DOCX / .PDF..."
+                  placeholder="Dán nội dung đề thi kèm bảng đáp án hoặc chọn tệp .DOCX / .PDF để hệ thống tự động nhận diện loại câu hỏi và đáp án..."
                 />
               </div>
             </>
@@ -1582,16 +1338,22 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                     className="w-full p-2 rounded bg-surface-container-lowest text-xs text-on-surface focus:outline-none"
                   />
                   <div className="grid grid-cols-3 gap-1.5">
-                    {[0, 1, 2].map((bIdx) => (
+                    {(previewExam.fillQuestion.blanks.length > 0
+                      ? previewExam.fillQuestion.blanks
+                      : ['', '', '']
+                    ).map((_, bIdx) => (
                       <input
                         key={bIdx}
                         type="text"
                         aria-label={`Đáp án ô trống ${bIdx + 1}`}
                         value={previewExam.fillQuestion.blanks[bIdx] || ''}
                         onChange={(e) => {
-                          const nextBlanks: [string, string, string] = [
+                          const nextBlanks = [
                             ...previewExam.fillQuestion.blanks,
-                          ] as [string, string, string];
+                          ];
+                          while (nextBlanks.length <= bIdx) {
+                            nextBlanks.push('');
+                          }
                           nextBlanks[bIdx] = e.target.value;
                           updateWorkingExam({
                             ...previewExam,
@@ -1859,48 +1621,74 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                   Chọn Lớp Học Nhận Đề Kiểm Tra (Khối {selectedGrade} — Giáo viên giao lớp nào sẽ được quyền xem bảng điểm lớp đó):
                 </span>
                 <span className="font-code-meta text-xs text-secondary font-bold">
-                  Đang chọn: {assignedClasses.join(', ') || `${selectedGrade}A1`}
+                  Đang chọn: {assignedClasses.join(', ') || 'Chưa chọn lớp'}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {Array.from(
-                  new Set([
-                    ...classrooms
-                      .filter((c) => c.grade === selectedGrade)
-                      .map((c) => c.name.toUpperCase()),
-                    `${selectedGrade}A1`,
-                    `${selectedGrade}A2`,
-                    `${selectedGrade}A3`,
-                  ])
-                ).map((clsName) => {
-                  const isChecked = assignedClasses.includes(clsName);
-                  return (
-                    <button
-                      key={clsName}
-                      id={`btnAssignClass-${clsName}`}
-                      type="button"
-                      onClick={() => {
-                        setAssignedClasses((prev) => {
-                          if (prev.includes(clsName)) {
-                            const next = prev.filter((c) => c !== clsName);
-                            return next.length > 0 ? next : [clsName];
-                          }
-                          return [...prev.filter((c) => c.startsWith(String(selectedGrade))), clsName];
-                        });
-                      }}
-                      className={`px-3 py-1.5 rounded-lg font-code-meta text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all border ${
-                        isChecked
-                          ? 'bg-primary text-on-primary border-primary shadow-sm'
-                          : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[15px]">
-                        {isChecked ? 'check_box' : 'check_box_outline_blank'}
-                      </span>
-                      <span>Lớp {clsName}</span>
-                    </button>
+                {(() => {
+                  const availableForGrade = Array.from(
+                    new Set(
+                      classrooms
+                        .filter((c) => c.grade === selectedGrade)
+                        .map((c) => c.name.toUpperCase())
+                    )
                   );
-                })}
+                  if (availableForGrade.length === 0) {
+                    return (
+                      <div className="flex flex-col gap-1.5 w-full py-1">
+                        <span className="font-body-sm text-xs text-on-surface-variant italic">
+                          Chưa có lớp học nào được tạo cho Khối {selectedGrade}. Vui lòng tạo lớp tại phân hệ Quản lý Lớp học hoặc nhập lớp tuỳ chọn bên dưới:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nhập mã lớp giao (VD: 9A1)..."
+                            className="px-2.5 py-1 text-xs rounded border border-outline-variant/40 bg-surface-container-low max-w-xs font-code-meta"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = (e.currentTarget.value || '').trim().toUpperCase();
+                                if (val && !assignedClasses.includes(val)) {
+                                  setAssignedClasses((prev) => [...prev, val]);
+                                  e.currentTarget.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <span className="text-[11px] text-on-surface-variant">(Nhấn Enter để thêm)</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return availableForGrade.map((clsName) => {
+                    const isChecked = assignedClasses.includes(clsName);
+                    return (
+                      <button
+                        key={clsName}
+                        id={`btnAssignClass-${clsName}`}
+                        type="button"
+                        onClick={() => {
+                          setAssignedClasses((prev) => {
+                            if (prev.includes(clsName)) {
+                              return prev.filter((c) => c !== clsName);
+                            }
+                            return [...prev, clsName];
+                          });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg font-code-meta text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all border ${
+                          isChecked
+                            ? 'bg-primary text-on-primary border-primary shadow-sm'
+                            : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {isChecked ? 'check_box' : 'check_box_outline_blank'}
+                        </span>
+                        <span>Lớp {clsName}</span>
+                      </button>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -2083,24 +1871,6 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                 </strong>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  id="btnCheckAndPreviewExam"
-                  type="button"
-                  onClick={() => {
-                    setShowInlinePrintPreview(true);
-                    document
-                      .getElementById('exam-import-print-preview')
-                      ?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-high font-label-md text-xs cursor-pointer whitespace-nowrap border border-outline-variant/40"
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    preview
-                  </span>
-                  <span>Xem Bản In A4</span>
-                </button>
-
                 <button
                   id="btnSaveExamToCloud"
                   type="button"
@@ -2119,7 +1889,6 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                 </button>
               </div>
             </div>
-          </div>
 
           {/* Validation Error Banner */}
           {validationError && (
@@ -2253,18 +2022,6 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                 ))}
               </div>
             </div>
-
-            <button
-              id="btnOpenFullModalPrintPreview"
-              type="button"
-              onClick={() => setShowFullModalPreview(true)}
-              className="w-full py-2.5 px-4 rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-lg text-label-lg flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                print
-              </span>
-              <span>Mở Bản Xem Trước Toàn Màn Hình (Print Preview A4)</span>
-            </button>
           </div>
 
           {/* Saved Cloud Exams List Scoped by Teacher & Subject */}
@@ -2401,124 +2158,127 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
         </div>
       </div>
 
-      {/* STEP 3: LIVE INLINE PRINT PREVIEW OF THE EXAM */}
-      <div id="exam-import-print-preview" className="w-full">
-        <div className="flex items-center justify-between mb-space-md print:hidden flex-wrap gap-2">
-          <div className="flex items-center gap-space-sm">
-            <div className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">
-                print
-              </span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-headline-md text-primary">
-                Bản Xem Trước Đề Thi Chuẩn PDF / A4 (Môn {selectedSubject} - Khối {selectedGrade} - Mã: {previewExam.code})
-              </h3>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Mọi chỉnh sửa câu hỏi trực tiếp, nạp đề theo môn/khối hoặc trộn đề đều được cập nhật tức thời trên trang giấy A4 dưới đây
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowInlinePrintPreview((prev) => !prev)}
-            className="px-3.5 py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md cursor-pointer"
-          >
-            {showInlinePrintPreview
-              ? 'Thu gọn Print Preview'
-              : 'Mở rộng Print Preview'}
-          </button>
-        </div>
-
-        {showInlinePrintPreview && <ExamPrintView exam={previewExam} inline />}
-      </div>
-
-      {/* FULL SCREEN PRINT PREVIEW MODAL */}
-      {showFullModalPreview && (
-        <ExamPrintView
-          exam={previewExam}
-          onClose={() => setShowFullModalPreview(false)}
-        />
-      )}
-
-      {/* EXAM INGESTION PROGRESS MODAL (CỬA SỔ TIẾN TRÌNH NẠP ĐỀ + NÚT XOÁ ĐỀ DEMO HỆ THỐNG) */}
+      {/* EXAM INGESTION PROGRESS MODAL (CỬA SỔ TIẾN TRÌNH NẠP ĐỀ - CHẶN TƯƠNG TÁC NỀN & KHÔNG CẦN API KEY) */}
       {ingestionModalOpen && (
         <div
           id="exam-ingestion-progress-modal"
           role="dialog"
           aria-modal="true"
           aria-label="Cửa sổ tiến trình nạp đề thi"
-          className="fixed inset-0 z-50 bg-on-surface/60 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto select-none"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-space-xl shadow-2xl border border-outline-variant/40 flex flex-col gap-space-md">
+          <div
+            className="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-space-xl shadow-2xl border border-outline-variant/40 flex flex-col gap-space-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3 border-b border-outline-variant/20 pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-md">
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ${
+                    ingestionError
+                      ? 'bg-error text-on-error'
+                      : ingestionPercent >= 100
+                      ? 'bg-tertiary-container text-on-tertiary-container'
+                      : 'bg-primary text-on-primary'
+                  }`}
+                >
                   <span className="material-symbols-outlined text-[24px]">
-                    {ingestionPercent >= 100 ? 'task_alt' : 'sync'}
+                    {ingestionError
+                      ? 'error'
+                      : ingestionPercent >= 100
+                      ? 'task_alt'
+                      : 'sync'}
                   </span>
                 </div>
                 <div>
                   <span className="font-code-meta text-xs text-secondary font-bold uppercase">
-                    Cửa Sổ Tiến Trình Nạp Đề Thi ({importFormatMode === 'freeform' ? 'Chế Độ Tự Do' : 'Chế Độ Khung Chuẩn'})
+                    Thuật Toán Tối Ưu Nhận Diện Quét OCR Cấu Trúc Đề &amp; Đáp Án Có Sẵn
                   </span>
                   <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                    {ingestionPercent >= 100
-                      ? 'Đã Nạp Đề Thi Mới Thành Công!'
-                      : 'Đang Xử Lý & Nạp Đề Thi Lên Hệ Thống...'}
+                    {ingestionError
+                      ? 'Nạp Đề Thi Thất Bại'
+                      : ingestionPercent >= 100
+                      ? 'Đã Quét Cấu Trúc Câu Hỏi & Đáp Án Thành Công!'
+                      : 'Đang Quét OCR Cấu Trúc Loại Câu Hỏi & Đáp Án...'}
                   </h3>
                 </div>
               </div>
               <span
                 id="ingestionProgressPercentBadge"
-                className="px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed font-code-meta text-sm font-bold"
+                className={`px-3 py-1 rounded-full font-code-meta text-sm font-bold ${
+                  ingestionError
+                    ? 'bg-error-container text-error'
+                    : 'bg-primary-fixed text-on-primary-fixed'
+                }`}
               >
-                {ingestionPercent}%
+                {ingestionError ? 'LỖI' : `${ingestionPercent}%`}
               </span>
             </div>
 
-            {/* Progress Bar */}
-            <div className="flex flex-col gap-2">
-              <div className="w-full h-3.5 rounded-full bg-surface-container-high overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300 rounded-full"
-                  style={{ width: `${ingestionPercent}%` }}
-                />
+            {/* Ingestion Error Alert */}
+            {ingestionError ? (
+              <div
+                id="ingestionErrorMessageBanner"
+                className="p-3.5 rounded-xl bg-error-container/30 border border-error/40 flex items-start gap-2.5 text-xs text-error"
+              >
+                <span className="material-symbols-outlined text-[20px] shrink-0 text-error">
+                  error
+                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="font-bold text-sm">Không thể nạp đề thi:</span>
+                  <p className="font-body-sm text-xs text-on-surface">
+                    {ingestionError}
+                  </p>
+                </div>
               </div>
-              <p className="font-code-meta text-xs text-primary font-semibold">
-                {ingestionStepText}
-              </p>
-            </div>
-
-            {/* 4 Step Checklist */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-surface-container-low p-3 rounded-xl text-xs">
-              {[
-                '1. Nhận diện định dạng đề (Tự do / Khung chuẩn)',
-                '2. Bóc tách câu hỏi trắc nghiệm & đáp án',
-                '3. Kiểm định điểm số & đồng bộ Cloud',
-                '4. Gắn lớp giao bài & kích hoạt lịch thi',
-              ].map((stepLabel, idx) => {
-                const done = ingestionStepIndex > idx;
-                return (
-                  <div
-                    key={stepLabel}
-                    className={`flex items-center gap-2 p-2 rounded-lg ${
-                      done
-                        ? 'bg-tertiary-container/30 text-on-surface font-semibold'
-                        : 'text-on-surface-variant'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-primary">
-                      {done ? 'check_circle' : 'radio_button_unchecked'}
-                    </span>
-                    <span>{stepLabel}</span>
+            ) : (
+              <>
+                {/* Progress Bar */}
+                <div className="flex flex-col gap-2">
+                  <div className="w-full h-3.5 rounded-full bg-surface-container-high overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300 rounded-full"
+                      style={{ width: `${ingestionPercent}%` }}
+                    />
                   </div>
-                );
-              })}
-            </div>
+                  <p className="font-code-meta text-xs text-primary font-semibold">
+                    {ingestionStepText}
+                  </p>
+                </div>
+
+                {/* 5 Step Checklist */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-surface-container-low p-3 rounded-xl text-xs">
+                  {[
+                    '1. Giải nén tài liệu & bảng biểu (.docx/.pdf/.txt)',
+                    '2. Nhận diện cấu trúc Trắc nghiệm, Điền khuyết, Trả lời ngắn, Tự luận',
+                    '3. Áp dụng đúng các loại câu hỏi thực tế có trong đề',
+                    '4. Quét bảng Đáp án & Hướng dẫn chấm có sẵn trong đề nạp',
+                    '5. Kiểm định thang điểm & đồng bộ ngân hàng đề',
+                  ].map((stepLabel, idx) => {
+                    const done = ingestionStepIndex > idx;
+                    return (
+                      <div
+                        key={stepLabel}
+                        className={`flex items-center gap-2 p-2 rounded-lg ${
+                          done
+                            ? 'bg-tertiary-container/30 text-on-surface font-semibold'
+                            : 'text-on-surface-variant'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-primary">
+                          {done ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span>{stepLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Completed Exam Summary + 1-Click Purge All Demo Exams Button */}
-            {ingestionCompletedExam && (
+            {!ingestionError && ingestionCompletedExam && (
               <div className="bg-surface-container p-space-md rounded-xl border border-outline-variant/30 flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -2532,13 +2292,27 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
                     </h4>
                   </div>
                   <span className="px-2.5 py-1 rounded bg-tertiary-container text-on-tertiary-container font-code-meta text-xs font-bold">
-                    {ingestionCompletedExam.questions.length} câu TN + 2 câu TL
+                    {[
+                      ingestionCompletedExam.questions.length > 0
+                        ? `${ingestionCompletedExam.questions.length} câu TN`
+                        : '',
+                      ingestionCompletedExam.fillQuestion.points > 0 &&
+                      ingestionCompletedExam.fillQuestion.promptTemplate.trim()
+                        ? `1 câu điền khuyết (${ingestionCompletedExam.fillQuestion.blanks.length} ô)`
+                        : '',
+                      ingestionCompletedExam.shortQuestion.points > 0 &&
+                      ingestionCompletedExam.shortQuestion.prompt.trim()
+                        ? '1 câu tự luận'
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' + ')}
                   </span>
                 </div>
 
                 {ingestionWarnings.length > 0 && (
                   <div className="text-[11px] font-code-meta text-on-surface-variant bg-surface-container-lowest p-2 rounded-lg">
-                    Ghi chú tự động: Đã chuẩn hoá {ingestionWarnings.length} mục phương án theo chế độ nạp đề tự do.
+                    Chi tiết quét: {ingestionWarnings.join(' • ')}
                   </div>
                 )}
 
@@ -2585,24 +2359,36 @@ export const ExamImportForm: React.FC<ExamImportFormProps> = ({
             )}
 
             <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
-              <button
-                type="button"
-                onClick={() => {
-                  setIngestionModalOpen(false);
-                  setActiveTab('direct_edit');
-                }}
-                className="px-3.5 py-2 rounded-xl bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-label-md text-xs font-bold cursor-pointer"
-              >
-                Mở Trình Sửa Chi Tiết Đề Vừa Nạp
-              </button>
-              <button
-                id="btnConfirmCloseIngestionModal"
-                type="button"
-                onClick={() => setIngestionModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-xs font-bold cursor-pointer shadow-sm"
-              >
-                Hoàn Tất &amp; Đóng Cửa Sổ Tiến Trình
-              </button>
+              {ingestionError ? (
+                <button
+                  type="button"
+                  onClick={() => setIngestionModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-error text-on-error font-label-md text-xs font-bold cursor-pointer shadow-sm"
+                >
+                  Đóng &amp; Thử Lại
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIngestionModalOpen(false);
+                      setActiveTab('direct_edit');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-label-md text-xs font-bold cursor-pointer"
+                  >
+                    Mở Trình Sửa Chi Tiết
+                  </button>
+                  <button
+                    id="btnConfirmCloseIngestionModal"
+                    type="button"
+                    onClick={() => setIngestionModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-primary text-on-primary hover:bg-primary-container font-label-md text-xs font-bold cursor-pointer shadow-sm"
+                  >
+                    Hoàn Tất &amp; Đóng
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

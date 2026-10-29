@@ -88,6 +88,10 @@ export const ClassroomAndStudentManager: React.FC<
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editingPasswordVal, setEditingPasswordVal] = useState<string>('');
 
+  // Reset all student passwords to 123456 state
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState<boolean>(false);
+  const [isResettingPasswords, setIsResettingPasswords] = useState<boolean>(false);
+
   // Live preview of Excel 3-column rows with auto-generated username & password
   const excelPreviewAccounts = useMemo(() => {
     return parseExcelStudentAccountsAutoCredentials(excelRawText, {
@@ -332,6 +336,46 @@ export const ClassroomAndStudentManager: React.FC<
       `Đã kết xuất danh sách ${filteredStudents.length} tài khoản học sinh ra tệp CSV!`
     );
     window.setTimeout(() => setStudentNotice(null), 3500);
+  };
+
+  // Reset all student passwords to 123456
+  const handleResetAllStudentPasswords = () => {
+    if (!isAdmin) {
+      setStudentError(
+        'Chỉ tài khoản Quản trị viên (admin) mới có quyền reset mật khẩu toàn bộ học sinh.'
+      );
+      return;
+    }
+    if (studentAccounts.length === 0) {
+      setStudentError('Chưa có tài khoản học sinh nào trong hệ thống để đặt lại mật khẩu.');
+      return;
+    }
+    setShowResetConfirmModal(true);
+  };
+
+  const confirmResetAllPasswords = async () => {
+    setIsResettingPasswords(true);
+    try {
+      const updatedList: StudentAccount[] = studentAccounts.map((s) => ({
+        ...s,
+        password: '123456',
+      }));
+      await onBulkSaveStudentAccounts(updatedList);
+      setShowResetConfirmModal(false);
+      setStudentError(null);
+      setStudentNotice(
+        `Thành công: Đã đặt lại mật khẩu của toàn bộ ${updatedList.length} học sinh thành "123456" trên cơ sở dữ liệu Cloud Firestore!`
+      );
+      window.setTimeout(() => setStudentNotice(null), 6000);
+    } catch (err) {
+      setStudentError(
+        `Lỗi khi reset mật khẩu học sinh: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    } finally {
+      setIsResettingPasswords(false);
+    }
   };
 
   return (
@@ -627,6 +671,18 @@ export const ClassroomAndStudentManager: React.FC<
                         ? 'Đóng Nạp Thủ Công'
                         : '+ Nạp Nhanh Thủ Công'}
                     </span>
+                  </button>
+                  <button
+                    id="btnResetAllStudentPasswords"
+                    type="button"
+                    onClick={handleResetAllStudentPasswords}
+                    className="px-3.5 py-1.5 rounded-lg bg-error-container text-on-error-container hover:bg-error hover:text-on-error font-label-md text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                    title="Đặt lại mật khẩu toàn bộ học sinh về 123456"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">
+                      lock_reset
+                    </span>
+                    <span>Reset Mật Khẩu Toàn Bộ HS (123456)</span>
                   </button>
                 </>
               )}
@@ -1016,70 +1072,104 @@ export const ClassroomAndStudentManager: React.FC<
           )}
 
           {/* Filter & Search Bar for Student Roster */}
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-container-low p-2.5 rounded-xl">
+          <div className="flex flex-col gap-2.5 bg-surface-container-low p-3 rounded-xl border border-outline-variant/20">
+            {/* Grade Selector */}
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-code-meta text-xs text-on-surface-variant">
-                Lọc theo lớp:
+              <span className="font-code-meta text-xs font-bold text-on-surface-variant flex items-center gap-1 shrink-0">
+                <span className="material-symbols-outlined text-[16px] text-primary">filter_alt</span>
+                Lọc Theo Khối:
               </span>
-              <button
-                type="button"
-                onClick={() => setSelectedClassFilter('ALL')}
-                className={`px-2.5 py-1 rounded font-code-meta text-xs cursor-pointer ${
-                  selectedClassFilter === 'ALL'
-                    ? 'bg-primary text-on-primary font-bold'
-                    : 'bg-surface-container-lowest text-on-surface'
-                }`}
-              >
-                Tất cả ({studentAccounts.length})
-              </button>
-              {filteredClassrooms.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setSelectedClassFilter(c.name)}
-                  className={`px-2.5 py-1 rounded font-code-meta text-xs cursor-pointer ${
-                    selectedClassFilter.toUpperCase() === c.name.toUpperCase()
-                      ? 'bg-secondary text-on-secondary font-bold'
-                      : 'bg-surface-container-lowest text-on-surface'
-                  }`}
-                >
-                  {c.name}
-                </button>
-              ))}
+              {(['ALL', 6, 7, 8, 9] as const).map((g) => {
+                const count =
+                  g === 'ALL'
+                    ? studentAccounts.length
+                    : studentAccounts.filter((s) => s.grade === g).length;
+                return (
+                  <button
+                    key={String(g)}
+                    type="button"
+                    onClick={() => {
+                      setSelectedGradeFilter(g);
+                      setSelectedClassFilter('ALL');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-code-meta text-xs font-bold cursor-pointer transition-all ${
+                      selectedGradeFilter === g
+                        ? 'bg-primary text-on-primary shadow-xs'
+                        : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {g === 'ALL' ? 'Tất cả khối' : `Khối ${g}`} ({count})
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="relative min-w-[220px]">
-              <input
-                type="text"
-                aria-label="Tìm kiếm tài khoản học sinh"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Tìm họ tên, ngày sinh, tài khoản..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface-container-lowest text-xs text-on-surface focus:outline-none"
-              />
-              <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
-                search
-              </span>
+            {/* Class Selector & Search Input */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-outline-variant/15">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-code-meta text-xs font-bold text-on-surface-variant shrink-0">
+                  Lọc Theo Lớp:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClassFilter('ALL')}
+                  className={`px-2.5 py-1 rounded-lg font-code-meta text-xs font-bold cursor-pointer transition-all ${
+                    selectedClassFilter === 'ALL'
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-high'
+                  }`}
+                >
+                  Tất cả lớp ({selectedGradeFilter === 'ALL' ? studentAccounts.length : studentAccounts.filter((s) => s.grade === selectedGradeFilter).length})
+                </button>
+                {filteredClassrooms.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedClassFilter(c.name)}
+                    className={`px-2.5 py-1 rounded-lg font-code-meta text-xs font-bold cursor-pointer transition-all ${
+                      selectedClassFilter.toUpperCase() === c.name.toUpperCase()
+                        ? 'bg-secondary text-on-secondary shadow-xs'
+                        : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-w-[220px]">
+                <input
+                  type="text"
+                  aria-label="Tìm kiếm tài khoản học sinh"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Tìm họ tên, ngày sinh, tài khoản..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-surface-container-lowest text-xs text-on-surface border border-outline-variant/20 focus:outline-none focus:ring-2 focus:ring-primary font-code-meta"
+                />
+                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
+                  search
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Student Accounts Table */}
-          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+          {/* Student Accounts Table with STICKY HEADER */}
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto relative rounded-xl border border-outline-variant/20 shadow-inner">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-surface-container-highest/50 text-on-surface-variant font-label-md text-xs uppercase">
-                  <th className="py-2.5 px-3 text-center">STT</th>
-                  <th className="py-2.5 px-3">Họ và Tên Học Sinh</th>
-                  <th className="py-2.5 px-3 text-center">Ngày Sinh</th>
-                  <th className="py-2.5 px-3 text-center">Lớp Học</th>
-                  <th className="py-2.5 px-3">Tài Khoản</th>
-                  <th className="py-2.5 px-3">Mật Khẩu</th>
+              <thead className="sticky top-0 z-10 bg-surface-container-high shadow-xs">
+                <tr className="text-on-surface font-label-md text-xs uppercase font-bold border-b border-outline-variant/30">
+                  <th className="py-2.5 px-3 text-center bg-surface-container-high">STT</th>
+                  <th className="py-2.5 px-3 bg-surface-container-high">Họ và Tên Học Sinh</th>
+                  <th className="py-2.5 px-3 text-center bg-surface-container-high">Ngày Sinh</th>
+                  <th className="py-2.5 px-3 text-center bg-surface-container-high">Lớp Học</th>
+                  <th className="py-2.5 px-3 bg-surface-container-high">Tài Khoản</th>
+                  <th className="py-2.5 px-3 bg-surface-container-high">Mật Khẩu</th>
                   {isAdmin && (
-                    <th className="py-2.5 px-3 text-center">Quản Trị</th>
+                    <th className="py-2.5 px-3 text-center bg-surface-container-high">Quản Trị</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant/20 font-body-sm text-xs">
+              <tbody className="divide-y divide-outline-variant/20 font-body-sm text-xs bg-surface-container-lowest">
                 {filteredStudents.map((stu, idx) => (
                   <tr
                     key={stu.id}
@@ -1164,6 +1254,78 @@ export const ClassroomAndStudentManager: React.FC<
           </div>
         </div>
       </div>
+
+      {/* Modal xác nhận Reset toàn bộ mật khẩu học sinh thành 123456 */}
+      {showResetConfirmModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
+        >
+          <div className="bg-surface-container-high rounded-2xl p-6 max-w-md w-full border border-outline-variant/30 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-amber-500">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl">lock_reset</span>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-on-surface">
+                  Xác nhận Reset Mật Khẩu
+                </h3>
+                <p className="text-xs text-on-surface-variant">
+                  Áp dụng cho toàn bộ học sinh trong trường
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-on-surface flex flex-col gap-1.5">
+              <p className="font-semibold text-amber-600 dark:text-amber-400">
+                Thao tác này sẽ đặt lại mật khẩu của toàn bộ <strong>{studentAccounts.length}</strong> học sinh thành mặc định:
+              </p>
+              <div className="bg-surface-container-lowest px-3 py-2 rounded-lg font-mono font-bold text-sm text-center text-primary tracking-widest border border-outline-variant/20">
+                123456
+              </div>
+              <p className="text-[11px] text-on-surface-variant">
+                Mật khẩu mới sẽ được cập nhật đồng bộ trực tiếp lên cơ sở dữ liệu Cloud Firestore. Học sinh có thể dùng mật khẩu <strong>123456</strong> để đăng nhập ngay sau khi hoàn tất.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirmModal(false)}
+                disabled={isResettingPasswords}
+                className="px-4 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container font-semibold text-xs cursor-pointer transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                id="btnConfirmResetAllPasswords"
+                type="button"
+                onClick={confirmResetAllPasswords}
+                disabled={isResettingPasswords}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-md disabled:opacity-50"
+              >
+                {isResettingPasswords ? (
+                  <>
+                    <span className="material-symbols-outlined text-[16px] animate-spin">
+                      progress_activity
+                    </span>
+                    <span>Đang cập nhật Firestore...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[16px]">
+                      check_circle
+                    </span>
+                    <span>Đồng ý Reset (123456)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
+

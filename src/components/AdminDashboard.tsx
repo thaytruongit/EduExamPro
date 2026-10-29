@@ -132,7 +132,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     useState<string>('123456');
   const [newTeacherSelectedClasses, setNewTeacherSelectedClasses] = useState<
     string[]
-  >(['7A1']);
+  >([]);
   const [teacherCreatedNotice, setTeacherCreatedNotice] = useState<
     string | null
   >(null);
@@ -391,16 +391,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const getClassesForGrade = (grade: number): string[] => {
     const dynamicClasses = classrooms
       .filter((c) => c.grade === grade)
-      .map((c) => c.name);
-    const defaults: Record<number, string[]> = {
-      6: ['6A1', '6A2'],
-      7: ['7A1', '7A2'],
-      8: ['8A1', '8A2'],
-      9: ['9A1', '9A2'],
-    };
-    const allForGrade = Array.from(
-      new Set([...dynamicClasses, ...(defaults[grade] || [])])
-    );
+      .map((c) => c.name.toUpperCase());
+    const allForGrade = Array.from(new Set(dynamicClasses));
     if (!isSystemAdmin) {
       const allowedForGrade = allForGrade.filter((cls) =>
         teacherAssignedClasses.includes(cls.toUpperCase())

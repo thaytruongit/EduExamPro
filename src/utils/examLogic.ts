@@ -1,3 +1,5 @@
+import JSZip from 'jszip';
+
 export type ScreenId =
   | 'cong-vao-thi'
   | 'phong-thi-truc-tuyen'
@@ -154,56 +156,7 @@ export interface ClassroomRecord {
   createdAt: string;
 }
 
-export const DEFAULT_CLASSROOMS: ClassroomRecord[] = [
-  {
-    id: 'class-9a1',
-    name: '9A1',
-    grade: 9,
-    homeroomTeacher: 'Thầy Trường',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'class-9a2',
-    name: '9A2',
-    grade: 9,
-    homeroomTeacher: 'Thầy Tuân',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'class-8a1',
-    name: '8A1',
-    grade: 8,
-    homeroomTeacher: 'Cô Hằng',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'class-8a2',
-    name: '8A2',
-    grade: 8,
-    homeroomTeacher: 'Cô Nguyễn Thị Lan',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'class-7a1',
-    name: '7A1',
-    grade: 7,
-    homeroomTeacher: 'Cô Lê Mai Hương',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'class-6a1',
-    name: '6A1',
-    grade: 6,
-    homeroomTeacher: 'Thầy Ngô Quang Huy',
-    schoolYear: '2024 - 2025',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-];
+export const DEFAULT_CLASSROOMS: ClassroomRecord[] = [];
 
 export interface StudentAccount {
   id: string;
@@ -216,68 +169,7 @@ export interface StudentAccount {
   createdAt: string;
 }
 
-export const DEFAULT_STUDENT_ACCOUNTS: StudentAccount[] = [
-  {
-    id: 'student-9a1-01',
-    fullName: 'Nguyễn Văn An',
-    dateOfBirth: '15/05/2010',
-    studentClass: '9A1',
-    grade: 9,
-    username: 'hs.an9a1',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'student-9a1-02',
-    fullName: 'Trần Thị Bình',
-    dateOfBirth: '22/08/2010',
-    studentClass: '9A1',
-    grade: 9,
-    username: 'hs.binh9a1',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'student-9a2-01',
-    fullName: 'Lê Hoàng Minh',
-    dateOfBirth: '10/11/2010',
-    studentClass: '9A2',
-    grade: 9,
-    username: 'hs.minh9a2',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'student-8a1-01',
-    fullName: 'Phạm Khánh Linh',
-    dateOfBirth: '04/03/2011',
-    studentClass: '8A1',
-    grade: 8,
-    username: 'hs.linh8a1',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'student-7a1-01',
-    fullName: 'Vũ Gia Huy',
-    dateOfBirth: '19/09/2012',
-    studentClass: '7A1',
-    grade: 7,
-    username: 'hs.huy7a1',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-  {
-    id: 'student-6a1-01',
-    fullName: 'Đặng Ngọc Mai',
-    dateOfBirth: '12/01/2013',
-    studentClass: '6A1',
-    grade: 6,
-    username: 'hs.mai6a1',
-    password: '123456',
-    createdAt: '2025-01-01T08:00:00.000Z',
-  },
-];
+export const DEFAULT_STUDENT_ACCOUNTS: StudentAccount[] = [];
 
 export interface StudentRegistration {
   grade: number;
@@ -309,8 +201,8 @@ export interface ExamQuestion {
 }
 
 export interface FillBlankQuestion {
-  promptTemplate: string; // Uses [1], [2], [3] placeholders
-  blanks: [string, string, string];
+  promptTemplate: string; // Uses [1], [2], ..., [N] placeholders
+  blanks: string[];
   points: number;
 }
 
@@ -380,6 +272,9 @@ export interface StudentRecord {
   finalScore: number;
   rank?: string;
   status: 'Tạm giữ chấm' | 'Đã trừ điểm' | 'Hợp lệ' | 'Đạt chuẩn';
+  shortAnswerScore?: number;
+  shortAnswerFeedback?: string;
+  shortAnswerGradedBy?: string;
   submittedAt?: string;
   answersJson?: string;
 }
@@ -571,10 +466,11 @@ export function calculateExamScore(params: {
 export function evaluateStudentSubmission(params: {
   exam: ExamBankData;
   selectedAnswers: Record<number, 'A' | 'B' | 'C' | 'D'>;
-  fillBlanks: [string, string, string];
+  fillBlanks: string[];
   shortAnswer: string;
   tabViolations: number;
   durationSeconds: number;
+  overrideShortAnswerScore?: number;
 }): {
   correctMcqCount: number;
   fillBlankScore: number;
@@ -594,6 +490,7 @@ export function evaluateStudentSubmission(params: {
     shortAnswer,
     tabViolations,
     durationSeconds,
+    overrideShortAnswerScore,
   } = params;
   let correctMcqCount = 0;
   for (const q of exam.questions) {
@@ -602,57 +499,94 @@ export function evaluateStudentSubmission(params: {
     }
   }
 
-  // Evaluate fill blanks
-  const expectedBlanks = exam.fillQuestion.blanks || [
-    'gãy khúc',
-    'tăng (hoặc giảm)',
-    'truyền thẳng',
-  ];
-  let matchedBlanks = 0;
-  for (let i = 0; i < 3; i++) {
-    const studentVal = (fillBlanks[i] || '').trim().toLowerCase();
-    const targetVal = (expectedBlanks[i] || '').trim().toLowerCase();
-    if (studentVal && targetVal) {
-      if (
-        studentVal === targetVal ||
-        targetVal.includes(studentVal) ||
-        studentVal.includes(targetVal)
-      ) {
+  // Evaluate fill blanks dynamically based on scanned blanks count
+  const hasFillSection =
+    Boolean(exam.fillQuestion?.promptTemplate?.trim()) &&
+    Number(exam.fillQuestion?.points) > 0;
+  const fillMax = hasFillSection ? Number(exam.fillQuestion.points) : 0;
+  let fillBlankScore = 0;
+
+  if (hasFillSection) {
+    const expectedBlanks = (exam.fillQuestion.blanks || []).filter(
+      (b) => typeof b === 'string'
+    );
+    const slotMatches = exam.fillQuestion.promptTemplate.match(/\[\d+\]/g);
+    const totalSlots = Math.max(
+      expectedBlanks.length,
+      slotMatches ? slotMatches.length : 0,
+      1
+    );
+    let matchedBlanks = 0;
+    for (let i = 0; i < totalSlots; i++) {
+      const studentVal = (fillBlanks[i] || '').trim().toLowerCase();
+      const targetVal = (expectedBlanks[i] || '').trim().toLowerCase();
+      if (studentVal && targetVal) {
+        if (
+          studentVal === targetVal ||
+          targetVal.includes(studentVal) ||
+          studentVal.includes(targetVal)
+        ) {
+          matchedBlanks++;
+        }
+      } else if (studentVal && !targetVal) {
         matchedBlanks++;
       }
     }
+    fillBlankScore = Number(((matchedBlanks / totalSlots) * fillMax).toFixed(2));
   }
-  const fillMax = exam.fillQuestion.points || 2.0;
-  const fillBlankScore = Number(((matchedBlanks / 3) * fillMax).toFixed(2));
 
-  // Evaluate short answer by keywords + length
-  const shortMax = exam.shortQuestion.points || 3.0;
-  const keywords = exam.shortQuestion.keywords || [];
+  // Evaluate short answer / essay by keywords + length or AI override
+  const hasShortSection =
+    Boolean(exam.shortQuestion?.prompt?.trim()) &&
+    Number(exam.shortQuestion?.points) > 0;
+  const shortMax = hasShortSection ? Number(exam.shortQuestion.points) : 0;
+  const keywords = exam.shortQuestion?.keywords || [];
   const lowerShort = shortAnswer.trim().toLowerCase();
   const matchedKeywords = keywords.filter((kw) =>
     lowerShort.includes(kw.trim().toLowerCase())
   );
 
   let shortAnswerScore = 0;
-  if (lowerShort.length > 0) {
-    if (keywords.length > 0) {
-      const ratio = matchedKeywords.length / keywords.length;
+  if (hasShortSection) {
+    if (
+      typeof overrideShortAnswerScore === 'number' &&
+      !isNaN(overrideShortAnswerScore)
+    ) {
       shortAnswerScore = Number(
-        Math.min(shortMax, Math.max(0.5, ratio * shortMax)).toFixed(2)
+        Math.min(shortMax, Math.max(0, overrideShortAnswerScore)).toFixed(2)
       );
-    } else {
-      shortAnswerScore =
-        countWords(shortAnswer) >= 10
-          ? shortMax
-          : Number((shortMax * 0.5).toFixed(2));
+    } else if (lowerShort.length > 0) {
+      if (keywords.length > 0) {
+        const ratio = matchedKeywords.length / keywords.length;
+        shortAnswerScore = Number(
+          Math.min(shortMax, Math.max(0.5, ratio * shortMax)).toFixed(2)
+        );
+      } else {
+        shortAnswerScore =
+          countWords(shortAnswer) >= 10
+            ? shortMax
+            : Number((shortMax * 0.5).toFixed(2));
+      }
     }
   }
 
-  const mcqPointsTotal = Number((10 - fillMax - shortMax).toFixed(2));
+  const explicitMcqSum = Number(
+    exam.questions.reduce((acc, q) => acc + (Number(q.points) || 0.5), 0).toFixed(2)
+  );
+  const remainingPool = Number((10 - fillMax - shortMax).toFixed(2));
+  const mcqPointsTotal =
+    exam.questions.length === 0
+      ? 0
+      : remainingPool > 0
+      ? remainingPool
+      : explicitMcqSum > 0
+      ? explicitMcqSum
+      : 5.0;
+
   const computed = calculateExamScore({
     multipleChoiceCorrect: correctMcqCount,
-    totalMcqQuestions: exam.questions.length || 10,
-    mcqPointsTotal: mcqPointsTotal > 0 ? mcqPointsTotal : 5.0,
+    totalMcqQuestions: exam.questions.length || 1,
+    mcqPointsTotal,
     fillBlankScore,
     shortAnswerScore,
     tabViolations,
@@ -931,7 +865,7 @@ interface SubjectTemplatePack {
     explanation: string;
   }>;
   fillTemplate: string;
-  fillBlanks: [string, string, string];
+  fillBlanks: string[];
   shortPrompt: string;
   shortRequirement: string;
   shortKeywords: string[];
@@ -1914,11 +1848,10 @@ export function parseAndValidateExamJson(
       ? rawFill.promptTemplate.trim()
       : DEFAULT_EXAM_BANK_ITEM.fillQuestion.promptTemplate;
   const rawBlanks = Array.isArray(rawFill.blanks) ? rawFill.blanks : [];
-  const fillBlanks: [string, string, string] = [
-    String(rawBlanks[0] || DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[0]).trim(),
-    String(rawBlanks[1] || DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[1]).trim(),
-    String(rawBlanks[2] || DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[2]).trim(),
-  ];
+  const fillBlanks: string[] =
+    rawBlanks.length > 0
+      ? rawBlanks.map((b) => String(b || '').trim())
+      : [...DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks];
 
   if (!parsed.fillQuestion) {
     warnings.push(
@@ -2060,10 +1993,8 @@ export function parseStandardExamText(
 
   let fillPoints = 2.0;
   let fillTemplate = DEFAULT_EXAM_BANK_ITEM.fillQuestion.promptTemplate;
-  const fillBlanks: [string, string, string] = [
-    DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[0],
-    DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[1],
-    DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks[2],
+  const fillBlanks: string[] = [
+    ...DEFAULT_EXAM_BANK_ITEM.fillQuestion.blanks,
   ];
 
   let shortPoints = 3.0;
@@ -2162,14 +2093,11 @@ export function parseStandardExamText(
       const contentMatch = line.match(/^NỘI DUNG\s*:\s*(.+)$/i);
       if (contentMatch) fillTemplate = contentMatch[1].trim();
 
-      const b1 = line.match(/^Ô TRỐNG 1\s*:\s*(.+)$/i);
-      if (b1) fillBlanks[0] = b1[1].trim();
-
-      const b2 = line.match(/^Ô TRỐNG 2\s*:\s*(.+)$/i);
-      if (b2) fillBlanks[1] = b2[1].trim();
-
-      const b3 = line.match(/^Ô TRỐNG 3\s*:\s*(.+)$/i);
-      if (b3) fillBlanks[2] = b3[1].trim();
+      const bMatch = line.match(/^Ô TRỐNG\s*(\d+)\s*:\s*(.+)$/i);
+      if (bMatch) {
+        const bIdx = Math.max(0, Number(bMatch[1]) - 1);
+        fillBlanks[bIdx] = bMatch[2].trim();
+      }
     } else if (section === 'SHORT') {
       const pMatch = line.match(/^ĐIỂM\s*:\s*([\d.]+)/i);
       if (pMatch) shortPoints = Number(pMatch[1]) || 3.0;
@@ -2259,29 +2187,71 @@ export function examToStandardTemplateText(exam: ExamBankData): string {
     ].join('\n');
   });
 
-  const fillBlock = [
-    ``,
-    `[PHẦN II - ĐIỀN KHUYẾT]`,
-    `ĐIỂM: ${exam.fillQuestion.points}`,
-    `NỘI DUNG: ${exam.fillQuestion.promptTemplate}`,
-    `Ô TRỐNG 1: ${exam.fillQuestion.blanks[0] || ''}`,
-    `Ô TRỐNG 2: ${exam.fillQuestion.blanks[1] || ''}`,
-    `Ô TRỐNG 3: ${exam.fillQuestion.blanks[2] || ''}`,
-  ].join('\n');
+  const fillBlock =
+    exam.fillQuestion && exam.fillQuestion.points > 0 && exam.fillQuestion.promptTemplate.trim()
+      ? [
+          ``,
+          `[PHẦN II - ĐIỀN KHUYẾT]`,
+          `ĐIỂM: ${exam.fillQuestion.points}`,
+          `NỘI DUNG: ${exam.fillQuestion.promptTemplate}`,
+          ...(exam.fillQuestion.blanks || []).map(
+            (val, idx) => `Ô TRỐNG ${idx + 1}: ${val || ''}`
+          ),
+        ].join('\n')
+      : '';
 
-  const shortBlock = [
-    ``,
-    `[PHẦN III - TỰ LUẬN NGẮN]`,
-    `ĐIỂM: ${exam.shortQuestion.points}`,
-    `ĐỀ BÀI: ${exam.shortQuestion.prompt}`,
-    `YÊU CẦU: ${exam.shortQuestion.requirement}`,
-    `TỪ KHÓA: ${(exam.shortQuestion.keywords || []).join(', ')}`,
-    `ĐÁP ÁN MẪU: ${exam.shortQuestion.sampleAnswer}`,
-  ].join('\n');
+  const shortBlock =
+    exam.shortQuestion && exam.shortQuestion.points > 0 && exam.shortQuestion.prompt.trim()
+      ? [
+          ``,
+          `[PHẦN III - TỰ LUẬN NGẮN]`,
+          `ĐIỂM: ${exam.shortQuestion.points}`,
+          `ĐỀ BÀI: ${exam.shortQuestion.prompt}`,
+          `YÊU CẦU: ${exam.shortQuestion.requirement}`,
+          `TỪ KHÓA: ${(exam.shortQuestion.keywords || []).join(', ')}`,
+          `ĐÁP ÁN MẪU: ${exam.shortQuestion.sampleAnswer}`,
+        ].join('\n')
+      : '';
 
-  return [...headerLines, questionBlocks.join('\n\n'), fillBlock, shortBlock].join(
-    '\n'
-  );
+  return [...headerLines, questionBlocks.join('\n\n'), fillBlock, shortBlock]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Helper to convert single-paragraph Word XML table rows (<w:tbl> -> <w:tr> -> <w:tc>)
+ * into pipe-delimited paragraphs so answer tables (`Câu | 1 | 2 ...`, `Đáp án | B | B ...`) stay on single lines.
+ */
+function normalizeWordXmlTablesToParagraphs(xmlStr: string): string {
+  return xmlStr.replace(/<w:tbl\b[\s\S]*?<\/w:tbl>/gi, (tblXml) => {
+    const rows = Array.from(tblXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/gi));
+    const convertedRows: string[] = [];
+    for (const r of rows) {
+      const cells = Array.from(r[0].matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/gi));
+      const hasMultiParaCell = cells.some((c) => {
+        const pMatches = c[0].match(/<\/w:p>/gi);
+        return pMatches && pMatches.length > 1;
+      });
+      if (hasMultiParaCell) {
+        convertedRows.push(r[0]);
+        continue;
+      }
+      const cellTexts = cells
+        .map((c) => {
+          const tMatches = Array.from(
+            c[0].matchAll(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/gi)
+          );
+          return tMatches.map((m) => m[1]).join('').trim();
+        })
+        .filter(Boolean);
+      if (cellTexts.length > 0) {
+        convertedRows.push(
+          `<w:p><w:r><w:t>${cellTexts.join(' | ')}</w:t></w:r></w:p>`
+        );
+      }
+    }
+    return convertedRows.join('');
+  });
 }
 
 /**
@@ -2292,7 +2262,8 @@ export function extractTextFromDocxOrPdfRaw(rawContent: string): string {
   const trimmed = rawContent.trim();
 
   if (trimmed.includes('<w:t') || trimmed.includes('<w:p')) {
-    const paragraphs = trimmed.split(/<\/w:p>/i);
+    const normalizedXml = normalizeWordXmlTablesToParagraphs(trimmed);
+    const paragraphs = normalizedXml.split(/<\/w:p>/i);
     const extractedLines: string[] = [];
     for (const p of paragraphs) {
       const matches = Array.from(p.matchAll(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/gi));
@@ -3839,6 +3810,902 @@ export function parseFreeformExamContent(
     mcqPointsTotal,
     warnings,
     parsedMode: 'freeform',
+  };
+}
+
+/**
+ * Extracts clean plain text paragraphs from a binary Microsoft Word (.docx) ArrayBuffer
+ * using JSZip client-side, preserving Word tables (<w:tbl>) as pipe-delimited rows.
+ */
+export async function extractTextFromDocxArrayBuffer(
+  buffer: ArrayBuffer
+): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const docXmlFile = zip.file('word/document.xml');
+    if (!docXmlFile) {
+      return '';
+    }
+    const rawXmlStr = await docXmlFile.async('string');
+    const xmlStr = normalizeWordXmlTablesToParagraphs(rawXmlStr);
+    const paragraphs = xmlStr.split(/<\/w:p>/i);
+    const lines: string[] = [];
+    for (const p of paragraphs) {
+      const matches = Array.from(
+        p.matchAll(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/gi)
+      );
+      if (matches.length > 0) {
+        const line = matches
+          .map((m) =>
+            m[1]
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+          )
+          .join('')
+          .trim();
+        if (line) lines.push(line);
+      }
+    }
+    return lines.join('\n');
+  } catch (err) {
+    console.error('JSZip docx extraction error:', err);
+    return '';
+  }
+}
+
+export interface ScanThreeSectionsResult {
+  ok: boolean;
+  exam: ExamBankData;
+  mcqCount: number;
+  hasFill: boolean;
+  hasShort: boolean;
+  warnings: string[];
+  error?: string;
+}
+
+/**
+ * Optimal Structural OCR & Document Scanner for THCS Exams:
+ * - Automatically detects and classifies question blocks into:
+ *   1. Trắc nghiệm khách quan (MCQ with A, B, C, D)
+ *   2. Điền khuyết (Fill-in-the-blank with variable blanks [1]..[N], e.g., (1) ...... to (6) ......)
+ *   3. Trả lời ngắn / Tự luận (Short answer / Essay with sub-parts a, b and grading criteria)
+ * - Scans embedded Answer Keys & Grading Guides at the end of the uploaded document
+ *   (including Word answer tables `Câu | 1..10` / `Đáp án | B B A...`, parenthetical fill answers `(1) ... | (2) ...`, and essay rubrics).
+ * - Uses ONLY the question types actually present in the scanned document ("quét được loại nào thì dùng loại đó làm đề").
+ */
+export function scanAndParseThreeExamSections(
+  rawText: string,
+  defaultGrade: number = 9,
+  defaultSubject: SubjectKey | string = 'Tin',
+  options: {
+    customCode?: string;
+    customTitle?: string;
+    durationMinutes?: number;
+    createdBy?: string;
+    teacherId?: string;
+    teacherUsername?: string;
+    teacherName?: string;
+  } = {}
+): ScanThreeSectionsResult {
+  if (!rawText || !rawText.trim()) {
+    return {
+      ok: false,
+      exam: DEFAULT_EXAM_BANK_ITEM,
+      mcqCount: 0,
+      hasFill: false,
+      hasShort: false,
+      warnings: [],
+      error: 'Tệp rỗng hoặc không trích xuất được nội dung văn bản.',
+    };
+  }
+
+  const warnings: string[] = [];
+  const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+  // 1. Detect Metadata Header (MÃ ĐỀ, TIÊU ĐỀ, MÔN HỌC, KHỐI LỚP, THỜI GIAN)
+  const codeMatch = text.match(/(?:^|\n|\|)\s*(?:mã\s*đề|code)\s*[:=-]\s*([^\n|]+)/i);
+  const titleMatch =
+    text.match(/(?:^|\n|\|)\s*(?:tiêu\s*đề|title)\s*[:=-]\s*([^\n|]+)/i) ||
+    text.match(/(?:^|\n|\|)\s*(ĐỀ\s+(?:KIỂM\s+TRA|KHẢO\s+SÁT|THI)[^\n|]+)/i);
+  const subjMatch = text.match(/(?:^|\n|\|)\s*(?:môn\s*học|subject|môn)\s*[:=-]\s*([^\n|]+)/i);
+  const gradeMatch = text.match(/(?:^|\n|\|)\s*(?:khối\s*lớp|khối|lớp|grade)\s*[:=-]?\s*([6-9])\b/i);
+  const durationMatch = text.match(/(?:^|\n|\|)\s*(?:thời\s*gian(?:\s*làm\s*bài)?|duration)\s*[:=-]?\s*(\d+)\s*(?:phút)?/i);
+
+  let detectedGrade = defaultGrade;
+  if (gradeMatch && [6, 7, 8, 9].includes(Number(gradeMatch[1]))) {
+    detectedGrade = Number(gradeMatch[1]);
+  } else if (subjMatch) {
+    const gInSubj = subjMatch[1].match(/\b([6-9])\b/);
+    if (gInSubj) {
+      detectedGrade = Number(gInSubj[1]);
+    }
+  } else {
+    const inlineGrade = text.match(/\b(?:lớp|khối|tin\s*học|toán|ngữ\s*văn|tiếng\s*anh|vật\s*lý|hóa\s*học|sinh\s*học|lịch\s*sử|địa\s*lý|gdcd|công\s*nghệ)\s*([6-9])\b/i);
+    if (inlineGrade) {
+      detectedGrade = Number(inlineGrade[1]);
+    }
+  }
+
+  const resolvedSubjectKey = subjMatch
+    ? normalizeSubjectKey(subjMatch[1])
+    : normalizeSubjectKey(defaultSubject);
+  const subjMeta = getSubjectMeta(resolvedSubjectKey);
+
+  const durationMinutes = durationMatch
+    ? Number(durationMatch[1])
+    : options.durationMinutes || 45;
+
+  const examCode =
+    options.customCode?.trim() ||
+    (codeMatch ? codeMatch[1].trim() : `${subjMeta.codePrefix}-${detectedGrade}-01`);
+
+  const examTitle =
+    options.customTitle?.trim() ||
+    (titleMatch
+      ? titleMatch[1].trim()
+      : `Đề Kiểm Tra Định Kỳ Môn ${subjMeta.label} Khối ${detectedGrade}`);
+
+  // 2. Check if this is an explicit EduExam Standard Template ([PHẦN I...], [PHẦN II...], [PHẦN III...])
+  const isEduExamTemplate =
+    /\[PHẦN\s*I\b/i.test(text) &&
+    (/NỘI\s*DUNG\s*:/i.test(text) || /ĐỀ\s*BÀI\s*:/i.test(text));
+
+  if (isEduExamTemplate) {
+    const hasPart1 = /\[PHẦN\s*I\b/i.test(text);
+    const hasPart2 = /\[PHẦN\s*II\b/i.test(text);
+    const hasPart3 = /\[PHẦN\s*III\b/i.test(text);
+    const parsedStd = parseStandardExamText(text, detectedGrade, resolvedSubjectKey);
+
+    const finalStdExam: ExamBankData = {
+      ...parsedStd,
+      id: `exam-${subjMeta.codePrefix.toLowerCase()}-k${detectedGrade}-${Date.now()}`,
+      code: examCode,
+      title: examTitle,
+      subject: resolvedSubjectKey,
+      subjectCode: resolvedSubjectKey,
+      grade: detectedGrade,
+      durationMinutes,
+      questions: hasPart1 ? parsedStd.questions : [],
+      fillQuestion: hasPart2
+        ? parsedStd.fillQuestion
+        : { promptTemplate: '', blanks: [], points: 0 },
+      shortQuestion: hasPart3
+        ? parsedStd.shortQuestion
+        : { prompt: '', requirement: '', keywords: [], sampleAnswer: '', points: 0 },
+      createdAt: new Date().toISOString(),
+      createdBy: options.createdBy || `GV Môn ${subjMeta.label}`,
+      teacherId: options.teacherId || 'admin-master',
+      teacherUsername: options.teacherUsername,
+      teacherName: options.teacherName || options.createdBy || `GV Môn ${subjMeta.label}`,
+      isActive: true,
+      isAssigned: true,
+    };
+
+    return {
+      ok: true,
+      exam: finalStdExam,
+      mcqCount: finalStdExam.questions.length,
+      hasFill: Boolean(finalStdExam.fillQuestion.promptTemplate && finalStdExam.fillQuestion.points > 0),
+      hasShort: Boolean(finalStdExam.shortQuestion.prompt && finalStdExam.shortQuestion.points > 0),
+      warnings,
+    };
+  }
+
+  // 3. Separate Questions Body vs Embedded Answer Key / Grading Guide at the end of the document
+  const rawLines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  let answerKeyStartLineIdx = -1;
+  let seenAtLeastOneMcqOption = false;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    if (/^[A-D]\s*[.):-]\s+.+/i.test(line) || /\bA\s*[.):-]\s*.+\s+B\s*[.):-]\s*/i.test(line)) {
+      seenAtLeastOneMcqOption = true;
+    }
+
+    // Explicit Answer Key / Grading Guide heading
+    if (
+      /^(?:I+|1|A|PHẦN)?\s*[.)-]?\s*(?:ĐÁP\s*ÁN\s*(?:VÀ|&|-)\s*(?:HƯỚNG\s*DẪN\s*CHẤM|BIỂU\s*ĐIỂM|THANG\s*ĐIỂM)|HƯỚNG\s*DẪN\s*CHẤM(?:\s*VÀ\s*BIỂU\s*ĐIỂM)?|BẢNG\s*ĐÁP\s*ÁN|ĐÁP\s*ÁN\s*ĐỀ\s*THI)\b/i.test(
+        line
+      ) ||
+      (seenAtLeastOneMcqOption &&
+        /^ĐÁP\s*ÁN(?:\s*$|(?:\s*[:=-]\s*(?:câu\s*)?\d+\s*[.:=-]?\s*[A-D]\b))/i.test(
+          line
+        ))
+    ) {
+      answerKeyStartLineIdx = i;
+      break;
+    }
+
+    // Answer key section heading like "1. PHẦN TRẮC NGHIỆM (5,0 ĐIỂM - MỖI CÂU ĐÚNG ĐƯỢC 0,5 ĐIỂM)" appearing after questions
+    if (
+      seenAtLeastOneMcqOption &&
+      /^(?:1|I)\s*[.)]\s*PHẦN\s*TRẮC\s*NGHIỆM\b/i.test(line) &&
+      (/MỖI\s*CÂU\s*ĐÚNG/i.test(line) ||
+        (rawLines[i + 1] && /^Câu\s*(?:\||:|\t|\s+1\b)/i.test(rawLines[i + 1])))
+    ) {
+      answerKeyStartLineIdx = i;
+      break;
+    }
+
+    // Direct answer table row "Câu | 1 | 2 | 3 ..." appearing after questions
+    if (
+      seenAtLeastOneMcqOption &&
+      /^Câu\s*\|\s*1\s*\|\s*2\b/i.test(line)
+    ) {
+      answerKeyStartLineIdx =
+        i > 0 && /PHẦN\s*TRẮC\s*NGHIỆM/i.test(rawLines[i - 1]) ? i - 1 : i;
+      break;
+    }
+  }
+
+  const bodyLines =
+    answerKeyStartLineIdx >= 0
+      ? rawLines.slice(0, answerKeyStartLineIdx)
+      : rawLines;
+  const answerKeyLines =
+    answerKeyStartLineIdx >= 0 ? rawLines.slice(answerKeyStartLineIdx) : [];
+  const answerKeyText = answerKeyLines.join('\n');
+
+  // 4. Parse Embedded Answer Key (MCQ Table / Pairs, Fill-in-the-blank Answers, Essay Rubric)
+  const mcqAnswerMap: Record<number, 'A' | 'B' | 'C' | 'D'> = {};
+  const fillAnswerMap: Record<number, string> = {};
+  let parsedShortSampleAnswer = '';
+  const parsedShortKeywords: string[] = [];
+
+  if (answerKeyLines.length > 0) {
+    // 4a. Parse pipe-delimited or whitespace-delimited MCQ Answer Table rows:
+    // Row 1: Câu | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+    // Row 2: Đáp án | B | B | A | A | B | A | B | B | A | B
+    for (let i = 0; i < answerKeyLines.length - 1; i++) {
+      const row1 = answerKeyLines[i];
+      const row2 = answerKeyLines[i + 1];
+      if (/^Câu\b/i.test(row1) && /^(?:Đáp\s*án|ĐA|Trả\s*lời)\b/i.test(row2)) {
+        const nums = Array.from(row1.matchAll(/\b(\d{1,3})\b/g)).map((m) =>
+          Number(m[1])
+        );
+        const strippedRow2 = row2.replace(/^(?:Đáp\s*án|ĐA|Trả\s*lời)\s*[|:-]?\s*/i, '');
+        const ansLetters = Array.from(
+          strippedRow2.matchAll(/\b([A-D])\b/gi)
+        ).map((m) => m[1].toUpperCase() as 'A' | 'B' | 'C' | 'D');
+        if (nums.length > 0 && ansLetters.length > 0) {
+          const count = Math.min(nums.length, ansLetters.length);
+          for (let k = 0; k < count; k++) {
+            mcqAnswerMap[nums[k]] = ansLetters[k];
+          }
+        }
+      }
+    }
+
+    // 4b. Parse vertical cell-by-cell table if cells were on separate lines (Câu, 1..N, Đáp án, B..B)
+    const cauLineIdx = answerKeyLines.findIndex((l) => /^Câu$/i.test(l));
+    const dapAnLineIdx = answerKeyLines.findIndex(
+      (l, idx) => idx > cauLineIdx && /^(?:Đáp\s*án|ĐA)$/i.test(l)
+    );
+    if (cauLineIdx !== -1 && dapAnLineIdx > cauLineIdx + 1) {
+      const qNums: number[] = [];
+      for (let i = cauLineIdx + 1; i < dapAnLineIdx; i++) {
+        if (/^\d{1,3}$/.test(answerKeyLines[i])) {
+          qNums.push(Number(answerKeyLines[i]));
+        }
+      }
+      const aLetters: ('A' | 'B' | 'C' | 'D')[] = [];
+      for (
+        let i = dapAnLineIdx + 1;
+        i < answerKeyLines.length && aLetters.length < qNums.length;
+        i++
+      ) {
+        if (/^[A-D]$/i.test(answerKeyLines[i])) {
+          aLetters.push(
+            answerKeyLines[i].toUpperCase() as 'A' | 'B' | 'C' | 'D'
+          );
+        } else {
+          break;
+        }
+      }
+      if (qNums.length > 0 && aLetters.length === qNums.length) {
+        qNums.forEach((n, idx) => {
+          mcqAnswerMap[n] = aLetters[idx];
+        });
+      }
+    }
+
+    // 4c. Parse inline pairs like "1. B", "1-B", "1: B", "Câu 1: B", "1B 2B 3A"
+    const inlinePairs = Array.from(
+      answerKeyText.matchAll(/(?:Câu\s*)?(\d{1,2})\s*[.:=-]\s*([A-D])\b/gi)
+    );
+    for (const m of inlinePairs) {
+      const qNum = Number(m[1]);
+      const letter = m[2].toUpperCase() as 'A' | 'B' | 'C' | 'D';
+      if (!mcqAnswerMap[qNum]) {
+        mcqAnswerMap[qNum] = letter;
+      }
+    }
+
+    // 4d. Parse Fill-in-the-blank answers in Answer Key:
+    // e.g. "(1) Tính mới | (2) Tính chính xác | (3) Tính đầy đủ"
+    //      "(4) Tính sử dụng được | (5) Vi xử lý | (6) Deepfake"
+    const parenMatches = Array.from(
+      answerKeyText.matchAll(/\((\d{1,2})\)\s*([^|\n()]+?)(?=\s*(?:\||\(\d{1,2}\)|\n|$))/g)
+    );
+    for (const pm of parenMatches) {
+      const slotNum = Number(pm[1]);
+      const val = pm[2].trim().replace(/[.;,]+$/, '').trim();
+      if (slotNum >= 1 && slotNum <= 20 && val && !/^\d+[,.]?\d*\s*điểm$/i.test(val)) {
+        fillAnswerMap[slotNum] = val;
+      }
+    }
+
+    // 4e. Parse Essay / Short-Answer grading guide from Answer Key
+    // Find lines under "2. PHẦN TỰ LUẬN" or "Bài 2" / "Câu tự luận" that are not the (1)..(N) fill answers
+    const essaySampleLines: string[] = [];
+    let inTuLuanAnswerSection = false;
+    let inEssayRubricBlock = false;
+
+    for (const line of answerKeyLines) {
+      if (/^(?:2|II|B)\s*[.)]\s*PHẦN\s*TỰ\s*LUẬN/i.test(line)) {
+        inTuLuanAnswerSection = true;
+        continue;
+      }
+      if (!inTuLuanAnswerSection && /^(?:Bài|Câu)\s*\d+/i.test(line)) {
+        inTuLuanAnswerSection = true;
+      }
+      if (!inTuLuanAnswerSection) continue;
+
+      // Skip lines that are purely fill-in-the-blank answer headers or (1)..(N) rows
+      if (
+        /(?:mỗi\s*(?:ý|vị\s*trí)\s*điền\s*đúng|điền\s*đúng\s*mỗi)/i.test(line) ||
+        (/^\(\d+\)/.test(line) && !/điểm\)\s*:/i.test(line))
+      ) {
+        continue;
+      }
+
+      if (/^(?:Bài|Câu)\s*\d+/i.test(line) || /^[a-d]\)\s+/i.test(line) || inEssayRubricBlock) {
+        const cleanedLine = line.replace(/^(?:Bài|Câu)\s*\d+\s*(?:\([^)]*điểm\))?\s*[:.-]?\s*/i, '').trim();
+        if (cleanedLine && !/(?:mỗi\s*(?:ý|vị\s*trí)\s*điền\s*đúng|điền\s*đúng\s*mỗi)/i.test(cleanedLine)) {
+          inEssayRubricBlock = true;
+          essaySampleLines.push(cleanedLine);
+        } else if (/^(?:Bài|Câu)\s*\d+/i.test(line)) {
+          inEssayRubricBlock = true;
+        }
+      }
+    }
+
+    if (essaySampleLines.length > 0) {
+      parsedShortSampleAnswer = essaySampleLines.join('\n');
+      // Extract meaningful keywords from bold/parenthetical steps or key terms in the rubric
+      const stepMatches = Array.from(
+        parsedShortSampleAnswer.matchAll(/Bước\s*\d+\s*\(([^)]+)\)/gi)
+      ).map((m) => m[1].trim());
+      if (stepMatches.length > 0) {
+        parsedShortKeywords.push(...stepMatches);
+      }
+      const candidateTerms = [
+        'Deepfake',
+        'xác minh',
+        'bình tĩnh',
+        'cảnh báo',
+        'PhET',
+        'GeoGebra',
+        'mô phỏng',
+        'trực quan',
+        'lừa đảo',
+      ];
+      for (const term of candidateTerms) {
+        if (
+          new RegExp(term, 'i').test(parsedShortSampleAnswer) &&
+          !parsedShortKeywords.includes(term)
+        ) {
+          parsedShortKeywords.push(term);
+        }
+      }
+    }
+  }
+
+  // 5. Scan & Classify Question Blocks in `bodyLines`
+  // Section headers help track point allocations and context, while each block is classified by its actual structure.
+  let currentSectionContext: 'MCQ' | 'FILL' | 'SHORT' = 'MCQ';
+  let mcqSectionHeaderPoints: number | null = null;
+  let essaySectionHeaderPoints: number | null = null;
+
+  interface RawQuestionBlock {
+    headerLabel: string;
+    explicitPoints?: number;
+    sectionContext: 'MCQ' | 'FILL' | 'SHORT';
+    promptLines: string[];
+    options: Partial<Record<'A' | 'B' | 'C' | 'D', string>>;
+    correctAnswer?: 'A' | 'B' | 'C' | 'D';
+    explanation?: string;
+  }
+
+  const rawBlocks: RawQuestionBlock[] = [];
+  let activeBlock: RawQuestionBlock | null = null;
+
+  const parsePointsFromText = (str: string): number | undefined => {
+    const m = str.match(/(\d+(?:[.,]\d+)?)\s*điểm/i);
+    if (!m) return undefined;
+    const val = Number(m[1].replace(',', '.'));
+    return !Number.isNaN(val) && val > 0 ? val : undefined;
+  };
+
+  const questionStartRegex =
+    /^(?:(câu\s*\d+|bài\s*\d+|question\s*\d+|q\d+|\d+\s*[.)/:-]))\s*(.*)$/i;
+  const optionLineRegex = /^(\*)?\s*([A-D])\s*[.):-]\s*(.+)$/i;
+  const inlineOptionsRegex =
+    /(?:^|\s+)(\*)?A\s*[.):-]\s*(.+?)\s+(?:\|\s*)?(\*)?B\s*[.):-]\s*(.+?)(?:\s+(?:\|\s*)?(\*)?C\s*[.):-]\s*(.+?))?(?:\s+(?:\|\s*)?(\*)?D\s*[.):-]\s*(.+))?$/i;
+  const inlineCDRegex =
+    /^(\*)?\s*C\s*[.):-]\s*(.+?)\s+(?:\|\s*)?(\*)?D\s*[.):-]\s*(.+)$/i;
+  const answerLineRegex =
+    /^(?:đáp\s*án|dap\s*an|key|answer|đ\/a)\s*[:=-]?\s*([A-D])\b/i;
+  const explanationLineRegex =
+    /^(?:giải\s*thích|hướng\s*dẫn|lời\s*giải)\s*[:=-]?\s*(.+)$/i;
+
+  for (const line of bodyLines) {
+    // Skip administrative / school header lines at the top of the exam
+    if (
+      /^(===|trường\s+|tổ\s+|phòng\s+gd|ủy\s+ban|ubnd\s+|đề\s+kiểm\s+tra|đề\s+khảo\s+sát|đề\s+thi|đề\s+chính\s+thức|năm\s+học|môn\s*[:=-]|môn\s+học|khối\s*lớp|thời\s*gian|mã\s*đề|tiêu\s*đề|họ\s+và\s+tên)/i.test(
+        line
+      )
+    ) {
+      continue;
+    }
+
+    // Detect Section Headers:
+    // - A. PHẦN TRẮC NGHIỆM (5,0 ĐIỂM) / PHẦN I: TRẮC NGHIỆM
+    if (
+      /^(?:[A-Z0-9]+\s*[.)]\s*)?(?:\[?\s*PHẦN\s*(?:I|1|A)?\s*[:.-]?\s*)?TRẮC\s*NGHIỆM\b/i.test(
+        line
+      )
+    ) {
+      currentSectionContext = 'MCQ';
+      const pts = parsePointsFromText(line);
+      if (pts) mcqSectionHeaderPoints = pts;
+      activeBlock = null;
+      continue;
+    }
+
+    // - PHẦN ĐIỀN KHUYẾT
+    if (
+      /^(?:[A-Z0-9]+\s*[.)]\s*)?(?:\[?\s*PHẦN\s*(?:II|2|B)?\s*[:.-]?\s*)?(?:ĐIỀN\s*KHUYẾT|ĐIỀN\s*VÀO\s*CHỖ\s*TRỐNG)\b/i.test(
+        line
+      )
+    ) {
+      currentSectionContext = 'FILL';
+      activeBlock = null;
+      continue;
+    }
+
+    // - B. PHẦN TỰ LUẬN (5,0 ĐIỂM) / PHẦN III: TỰ LUẬN / TRẢ LỜI NGẮN
+    if (
+      /^(?:[A-Z0-9]+\s*[.)]\s*)?(?:\[?\s*PHẦN\s*(?:II|III|2|3|B|C)?\s*[:.-]?\s*)?(?:TỰ\s*LUẬN|TRẢ\s*LỜI\s*NGẮN)\b/i.test(
+        line
+      )
+    ) {
+      currentSectionContext = 'SHORT';
+      const pts = parsePointsFromText(line);
+      if (pts) essaySectionHeaderPoints = pts;
+      activeBlock = null;
+      continue;
+    }
+
+    // Check inline Đáp án / Giải thích for the active block
+    const ansMatch = line.match(answerLineRegex);
+    if (ansMatch && activeBlock) {
+      activeBlock.correctAnswer = ansMatch[1].toUpperCase() as
+        | 'A'
+        | 'B'
+        | 'C'
+        | 'D';
+      continue;
+    }
+
+    const expMatch = line.match(explanationLineRegex);
+    if (expMatch && activeBlock) {
+      activeBlock.explanation = expMatch[1].trim();
+      continue;
+    }
+
+    // Check inline multi-option line first (e.g. "A. ... B. ... C. ... D. ..." or "A. ... B. ...")
+    const inlineOnlyMatch = line.match(inlineOptionsRegex);
+    if (
+      inlineOnlyMatch &&
+      !/^(?:câu\s*\d+|bài\s*\d+|question\s*\d+|q\d+|\d+\s*[.)/:-])/i.test(line)
+    ) {
+      if (!activeBlock) {
+        activeBlock = {
+          headerLabel: `Câu ${rawBlocks.length + 1}`,
+          sectionContext: 'MCQ',
+          promptLines: [`Câu hỏi số ${rawBlocks.length + 1}`],
+          options: {},
+        };
+        rawBlocks.push(activeBlock);
+      }
+      if (inlineOnlyMatch[2]) {
+        activeBlock.options.A = `A. ${inlineOnlyMatch[2].trim()}`;
+        if (inlineOnlyMatch[1]) activeBlock.correctAnswer = 'A';
+      }
+      if (inlineOnlyMatch[4]) {
+        activeBlock.options.B = `B. ${inlineOnlyMatch[4].trim()}`;
+        if (inlineOnlyMatch[3]) activeBlock.correctAnswer = 'B';
+      }
+      if (inlineOnlyMatch[6]) {
+        activeBlock.options.C = `C. ${inlineOnlyMatch[6].trim()}`;
+        if (inlineOnlyMatch[5]) activeBlock.correctAnswer = 'C';
+      }
+      if (inlineOnlyMatch[8]) {
+        activeBlock.options.D = `D. ${inlineOnlyMatch[8].trim()}`;
+        if (inlineOnlyMatch[7]) activeBlock.correctAnswer = 'D';
+      }
+      continue;
+    }
+
+    // Check 2-column C & D option line ("C. ... D. ...")
+    const inlineCDMatch = line.match(inlineCDRegex);
+    if (inlineCDMatch && activeBlock) {
+      activeBlock.options.C = `C. ${inlineCDMatch[2].trim()}`;
+      if (inlineCDMatch[1]) activeBlock.correctAnswer = 'C';
+      activeBlock.options.D = `D. ${inlineCDMatch[4].trim()}`;
+      if (inlineCDMatch[3]) activeBlock.correctAnswer = 'D';
+      continue;
+    }
+
+    // Check if line is a single A/B/C/D option
+    const optMatch = line.match(optionLineRegex);
+    if (optMatch && (currentSectionContext === 'MCQ' || (activeBlock && Object.keys(activeBlock.options).length > 0) || /^[A-D]\.\s/.test(line))) {
+      if (!activeBlock) {
+        activeBlock = {
+          headerLabel: `Câu ${rawBlocks.length + 1}`,
+          sectionContext: 'MCQ',
+          promptLines: [`Câu hỏi số ${rawBlocks.length + 1}`],
+          options: {},
+        };
+        rawBlocks.push(activeBlock);
+      }
+      const isStarred = Boolean(optMatch[1]);
+      const key = optMatch[2].toUpperCase() as 'A' | 'B' | 'C' | 'D';
+      const val = optMatch[3].trim();
+      activeBlock.options[key] = `${key}. ${val.replace(/^[A-D]\s*[.):-]\s*/i, '')}`;
+      if (isStarred) {
+        activeBlock.correctAnswer = key;
+      }
+      continue;
+    }
+
+    // Check if line starts a new Question / Bài block (e.g. "Câu 1:", "Bài 11 (3,0 điểm):", "Bài 12 (2,0 điểm):")
+    const qMatch = line.match(questionStartRegex);
+    if (qMatch) {
+      const headerTag = qMatch[1].trim();
+      let restOfLine = (qMatch[2] || '').trim();
+
+      // Extract explicit points in header like "(3,0 điểm):"
+      let explicitPts: number | undefined = undefined;
+      const headerPtsMatch = restOfLine.match(/^\(\s*(\d+(?:[.,]\d+)?)\s*điểm\s*\)\s*[:.-]?\s*(.*)$/i);
+      if (headerPtsMatch) {
+        explicitPts = Number(headerPtsMatch[1].replace(',', '.'));
+        restOfLine = (headerPtsMatch[2] || '').trim();
+      } else {
+        restOfLine = restOfLine.replace(/^[:.-]\s*/, '').trim();
+      }
+
+      const newBlock: RawQuestionBlock = {
+        headerLabel: headerTag,
+        explicitPoints: explicitPts,
+        sectionContext: currentSectionContext,
+        promptLines: [],
+        options: {},
+      };
+
+      const inlineMatch = restOfLine.match(inlineOptionsRegex);
+      if (inlineMatch && inlineMatch.index !== undefined) {
+        const beforeOpts = restOfLine.slice(0, inlineMatch.index).trim();
+        if (beforeOpts) newBlock.promptLines.push(beforeOpts);
+        if (inlineMatch[2]) {
+          newBlock.options.A = `A. ${inlineMatch[2].trim()}`;
+          if (inlineMatch[1]) newBlock.correctAnswer = 'A';
+        }
+        if (inlineMatch[4]) {
+          newBlock.options.B = `B. ${inlineMatch[4].trim()}`;
+          if (inlineMatch[3]) newBlock.correctAnswer = 'B';
+        }
+        if (inlineMatch[6]) {
+          newBlock.options.C = `C. ${inlineMatch[6].trim()}`;
+          if (inlineMatch[5]) newBlock.correctAnswer = 'C';
+        }
+        if (inlineMatch[8]) {
+          newBlock.options.D = `D. ${inlineMatch[8].trim()}`;
+          if (inlineMatch[7]) newBlock.correctAnswer = 'D';
+        }
+      } else if (restOfLine) {
+        const embeddedAns = restOfLine.match(/\[(?:đáp\s*án|key)?\s*:?\s*([A-D])\]/i);
+        if (embeddedAns) {
+          newBlock.correctAnswer = embeddedAns[1].toUpperCase() as
+            | 'A'
+            | 'B'
+            | 'C'
+            | 'D';
+          restOfLine = restOfLine.replace(embeddedAns[0], '').trim();
+        }
+        if (restOfLine) newBlock.promptLines.push(restOfLine);
+      }
+
+      activeBlock = newBlock;
+      rawBlocks.push(newBlock);
+      continue;
+    }
+
+    if (activeBlock) {
+      activeBlock.promptLines.push(line);
+    } else if (currentSectionContext !== 'MCQ') {
+      // If a Fill or Essay section starts directly with a paragraph without "Câu/Bài", create a block
+      activeBlock = {
+        headerLabel: `Bài ${rawBlocks.length + 1}`,
+        sectionContext: currentSectionContext,
+        promptLines: [line],
+        options: {},
+      };
+      rawBlocks.push(activeBlock);
+    }
+  }
+
+  // 6. Classify each scanned block into MCQ, Fill-in-the-blank, or Short Answer / Essay
+  const mcqBlocks: RawQuestionBlock[] = [];
+  const fillBlocks: RawQuestionBlock[] = [];
+  const shortBlocks: RawQuestionBlock[] = [];
+
+  for (const b of rawBlocks) {
+    const optionCount = Object.keys(b.options).length;
+    const joinedPrompt = b.promptLines.join('\n').trim();
+
+    if (optionCount >= 2) {
+      mcqBlocks.push(b);
+      continue;
+    }
+
+    // Check if block is a Fill-in-the-blank question (Điền khuyết):
+    // - Contains numbered blanks like `(1) ...`, `(2) ...` or `[1]`, `[2]`
+    // - Contains `......` or `____` blanks
+    // - Prompt mentions `điền vào ... chỗ trống` / `ô trống` / `chọn các từ/cụm từ thích hợp`
+    const hasNumberedParenBlanks =
+      /\(\d+\)\s*(?:\.{2,}|_{2,}|…+)/.test(joinedPrompt) ||
+      (/\(\s*1\s*\)/.test(joinedPrompt) && /\(\s*2\s*\)/.test(joinedPrompt));
+    const hasBracketBlanks = /\[\d+\]/.test(joinedPrompt);
+    const hasDotsBlanks = /\.{4,}|_{4,}|…{2,}/.test(joinedPrompt);
+    const hasFillInstruction =
+      /điền\s+vào|chỗ\s+trống|ô\s+trống|cụm\s+từ\s+thích\s+hợp/i.test(
+        joinedPrompt
+      );
+
+    if (
+      b.sectionContext === 'FILL' ||
+      hasNumberedParenBlanks ||
+      hasBracketBlanks ||
+      (hasFillInstruction && (hasDotsBlanks || hasNumberedParenBlanks))
+    ) {
+      fillBlocks.push(b);
+      continue;
+    }
+
+    // Otherwise, if it's in SHORT/TỰ LUẬN section or has substantive prompt text without options, classify as Short/Essay
+    if (joinedPrompt.length > 0) {
+      shortBlocks.push(b);
+    }
+  }
+
+  // 7. Build Final Scanned Sections (Strictly using ONLY the question types found in the file!)
+  // 7a. Build Fill-in-the-blank Section (if present)
+  let fillQuestion: FillBlankQuestion = {
+    promptTemplate: '',
+    blanks: [],
+    points: 0,
+  };
+
+  if (fillBlocks.length > 0) {
+    const fb = fillBlocks[0];
+    let rawFillPrompt = fb.promptLines.join('\n').trim();
+
+    // Convert `(1) ......`, `(2) ......` or `(1)` .. `(N)` into `[1]`, `[2]`, ..., `[N]`
+    rawFillPrompt = rawFillPrompt.replace(
+      /\((\d{1,2})\)\s*(?:\.{2,}|_{2,}|…+)?/g,
+      (_match, numStr) => `[${Number(numStr)}]`
+    );
+
+    // If there are still unnumbered `......` or `____` blanks and no `[1]`, number them sequentially
+    if (!/\[\d+\]/.test(rawFillPrompt)) {
+      let seq = 1;
+      rawFillPrompt = rawFillPrompt.replace(/(\.{3,}|_{3,}|…{2,})/g, () => {
+        const token = `[${seq}]`;
+        seq++;
+        return token;
+      });
+    }
+
+    // Count how many `[k]` slots exist in `rawFillPrompt`
+    const slotNums = Array.from(rawFillPrompt.matchAll(/\[(\d+)\]/g)).map((m) =>
+      Number(m[1])
+    );
+    const maxSlot =
+      slotNums.length > 0
+        ? Math.max(...slotNums)
+        : Object.keys(fillAnswerMap).length;
+    const totalBlanksCount = Math.max(maxSlot, Object.keys(fillAnswerMap).length, 1);
+
+    // Also check if candidate words are listed in parentheses in the prompt header, e.g.
+    // "Chọn các từ/cụm từ thích hợp (Tính đầy đủ, Tính chính xác, ...) để điền vào 6 chỗ trống"
+    const candidateWordsMatch = rawFillPrompt.match(
+      /thích\s+hợp\s*\(([^)]+)\)\s*để\s*điền/i
+    );
+    const candidateWords = candidateWordsMatch
+      ? candidateWordsMatch[1]
+          .split(/[,;]+/)
+          .map((w) => w.trim())
+          .filter(Boolean)
+      : [];
+
+    const resolvedBlanks: string[] = [];
+    for (let i = 1; i <= totalBlanksCount; i++) {
+      resolvedBlanks.push(
+        fillAnswerMap[i] || candidateWords[i - 1] || ''
+      );
+    }
+
+    const fillPts =
+      fb.explicitPoints ||
+      parsePointsFromText(rawFillPrompt) ||
+      (shortBlocks.length === 0 && essaySectionHeaderPoints
+        ? essaySectionHeaderPoints
+        : 3.0);
+
+    fillQuestion = {
+      promptTemplate: rawFillPrompt,
+      blanks: resolvedBlanks,
+      points: fillPts,
+    };
+  }
+
+  // 7b. Build Short Answer / Essay Section (if present)
+  let shortQuestion: ShortAnswerQuestion = {
+    prompt: '',
+    requirement: '',
+    keywords: [],
+    sampleAnswer: '',
+    points: 0,
+  };
+
+  if (shortBlocks.length > 0) {
+    const sb = shortBlocks[0];
+    const allLines = sb.promptLines;
+    const subPartLines = allLines.filter((l) => /^[a-d]\)\s+/i.test(l));
+    const mainLines = allLines.filter((l) => !/^[a-d]\)\s+/i.test(l));
+
+    const promptText =
+      mainLines.length > 0 && subPartLines.length > 0
+        ? mainLines.join('\n').trim()
+        : allLines.join('\n').trim();
+    const reqText =
+      subPartLines.length > 0
+        ? subPartLines.join('\n').trim()
+        : 'Trình bày rõ ràng, đầy đủ các ý theo yêu cầu của câu hỏi.';
+
+    // Sum sub-part points if header didn't specify total points
+    let subPartPtsSum = 0;
+    for (const sl of subPartLines) {
+      const p = parsePointsFromText(sl);
+      if (p) subPartPtsSum += p;
+    }
+
+    const shortPts =
+      sb.explicitPoints ||
+      (subPartPtsSum > 0 ? subPartPtsSum : undefined) ||
+      (essaySectionHeaderPoints && fillQuestion.points > 0
+        ? Math.max(1.0, essaySectionHeaderPoints - fillQuestion.points)
+        : essaySectionHeaderPoints || 2.0);
+
+    shortQuestion = {
+      prompt: promptText,
+      requirement: reqText,
+      keywords: parsedShortKeywords,
+      sampleAnswer:
+        parsedShortSampleAnswer ||
+        'Chấm theo hướng dẫn chấm và biểu điểm của giáo viên bộ môn.',
+      points: shortPts,
+    };
+  }
+
+  // 7c. Build Multiple Choice Questions Section (if present)
+  const totalNonMcqPoints = Number(
+    (fillQuestion.points + shortQuestion.points).toFixed(2)
+  );
+  const mcqPoolPoints =
+    mcqSectionHeaderPoints ||
+    (totalNonMcqPoints > 0 && totalNonMcqPoints < 10
+      ? Number((10 - totalNonMcqPoints).toFixed(2))
+      : 5.0);
+
+  const mcqQuestions: ExamQuestion[] = mcqBlocks.map((b, idx) => {
+    const qNumber = idx + 1;
+    const prompt =
+      b.promptLines.join(' ').trim() ||
+      `Câu hỏi trắc nghiệm số ${qNumber}`;
+    const keys: ('A' | 'B' | 'C' | 'D')[] = ['A', 'B', 'C', 'D'];
+    const builtOptions = keys.map((k) => ({
+      key: k,
+      text: b.options[k] || `${k}. Phương án ${k}`,
+    }));
+
+    const resolvedCorrect: 'A' | 'B' | 'C' | 'D' =
+      b.correctAnswer || mcqAnswerMap[qNumber] || 'A';
+
+    return {
+      id: qNumber,
+      subject: `${resolvedSubjectKey} ${detectedGrade}`,
+      type: 'mcq',
+      points: Number((mcqPoolPoints / Math.max(1, mcqBlocks.length)).toFixed(2)),
+      prompt,
+      options: builtOptions,
+      correctAnswer: resolvedCorrect,
+      explanation:
+        b.explanation ||
+        (mcqAnswerMap[qNumber]
+          ? `Đáp án đúng: ${resolvedCorrect} (Quét từ bảng đáp án trong đề).`
+          : `Đáp án đúng: ${resolvedCorrect}.`),
+    };
+  });
+
+  const hasMcq = mcqQuestions.length > 0;
+  const hasFill = Boolean(
+    fillQuestion.promptTemplate.trim() && fillQuestion.points > 0
+  );
+  const hasShort = Boolean(
+    shortQuestion.prompt.trim() && shortQuestion.points > 0
+  );
+
+  if (!hasMcq && !hasFill && !hasShort) {
+    return {
+      ok: false,
+      exam: DEFAULT_EXAM_BANK_ITEM,
+      mcqCount: 0,
+      hasFill: false,
+      hasShort: false,
+      warnings: [],
+      error:
+        'Không nhận diện được câu hỏi nào từ tài liệu tải lên. Vui lòng kiểm tra lại định dạng tệp.',
+    };
+  }
+
+  const finalExam: ExamBankData = {
+    id: `exam-${subjMeta.codePrefix.toLowerCase()}-k${detectedGrade}-${Date.now()}`,
+    code: examCode,
+    title: examTitle,
+    subject: resolvedSubjectKey,
+    subjectCode: resolvedSubjectKey,
+    grade: detectedGrade,
+    durationMinutes,
+    questions: mcqQuestions,
+    fillQuestion,
+    shortQuestion,
+    createdAt: new Date().toISOString(),
+    createdBy: options.createdBy || `GV Môn ${subjMeta.label}`,
+    teacherId: options.teacherId || 'admin-master',
+    teacherUsername: options.teacherUsername,
+    teacherName:
+      options.teacherName || options.createdBy || `GV Môn ${subjMeta.label}`,
+    isActive: true,
+    isAssigned: true,
+  };
+
+  return {
+    ok: true,
+    exam: finalExam,
+    mcqCount: finalExam.questions.length,
+    hasFill,
+    hasShort,
+    warnings,
   };
 }
 

@@ -13,8 +13,8 @@ interface ExamRoomProps {
   onUpdateRemainingSeconds: (nextSeconds: number) => void;
   selectedAnswers: Record<number, 'A' | 'B' | 'C' | 'D'>;
   onSelectAnswer: (qId: number, choice: 'A' | 'B' | 'C' | 'D') => void;
-  fillBlanks: [string, string, string];
-  onChangeFillBlank: (index: 0 | 1 | 2, value: string) => void;
+  fillBlanks: string[];
+  onChangeFillBlank: (index: number, value: string) => void;
   shortAnswer: string;
   onChangeShortAnswer: (value: string) => void;
   tabViolations: number;
@@ -102,13 +102,30 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
     );
   };
 
-  const mcqList = exam.questions;
-  const fillQuestionNumber = mcqList.length + 1;
-  const shortQuestionNumber = mcqList.length + 2;
-  const totalQuestionsCount = mcqList.length + 2;
+  const mcqList = exam.questions || [];
+  const hasMcq = mcqList.length > 0;
+  const hasFill =
+    Boolean(exam.fillQuestion?.promptTemplate?.trim()) &&
+    Number(exam.fillQuestion?.points) > 0;
+  const hasShort =
+    Boolean(exam.shortQuestion?.prompt?.trim()) &&
+    Number(exam.shortQuestion?.points) > 0;
 
-  const isFillCompleted = fillBlanks.every((b) => b.trim().length > 0);
-  const isShortCompleted = shortAnswer.trim().length > 0;
+  const fillQuestionNumber = mcqList.length + 1;
+  const shortQuestionNumber = mcqList.length + (hasFill ? 2 : 1);
+  const totalQuestionsCount =
+    mcqList.length + (hasFill ? 1 : 0) + (hasShort ? 1 : 0);
+
+  const expectedBlankCount = Math.max(
+    1,
+    exam.fillQuestion?.blanks?.length || 1
+  );
+  const isFillCompleted =
+    hasFill &&
+    Array.from({ length: expectedBlankCount }).every(
+      (_, idx) => (fillBlanks[idx] || '').trim().length > 0
+    );
+  const isShortCompleted = hasShort && shortAnswer.trim().length > 0;
   const mcqCompletedCount = mcqList.filter((q) =>
     Boolean(selectedAnswers[q.id])
   ).length;
@@ -147,55 +164,32 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
     : mcqList;
 
   const showFillQ =
-    !filterFlagsOnly || flaggedQuestions.includes(fillQuestionNumber);
+    hasFill &&
+    (!filterFlagsOnly || flaggedQuestions.includes(fillQuestionNumber));
   const showShortQ =
-    !filterFlagsOnly || flaggedQuestions.includes(shortQuestionNumber);
+    hasShort &&
+    (!filterFlagsOnly || flaggedQuestions.includes(shortQuestionNumber));
 
-  // Split fill template by [1], [2], [3] to render interactive inline inputs
+  // Split fill template by [1], [2], ..., [N] to render interactive inline inputs
   const renderInteractiveFillQuestion = () => {
-    const tpl = exam.fillQuestion.promptTemplate;
-    const parts = tpl.split(/(\[1\]|\[2\]|\[3\])/g);
+    const tpl = exam.fillQuestion.promptTemplate || '';
+    const parts = tpl.split(/(\[\d+\])/g);
     return (
-      <div className="font-body-lg text-body-lg text-on-surface leading-loose">
+      <div className="font-body-lg text-body-lg text-on-surface leading-loose whitespace-pre-line">
         {parts.map((part, idx) => {
-          if (part === '[1]') {
+          const match = part.match(/^\[(\d+)\]$/);
+          if (match) {
+            const slotNum = Number(match[1]);
+            const slotIdx = Math.max(0, slotNum - 1);
             return (
-              <span key={idx} className="inline-block px-1">
+              <span key={idx} className="inline-block px-1 my-0.5">
                 <input
-                  aria-label="Điền khuyết cụm từ 1"
-                  className="w-40 px-space-sm py-1 rounded-lg bg-surface-container text-primary font-bold focus:outline-none focus:ring-2 focus:ring-secondary text-center"
-                  placeholder="(điền cụm từ 1)"
-                  type="text"
-                  value={fillBlanks[0]}
-                  onChange={(e) => onChangeFillBlank(0, e.target.value)}
-                />
-              </span>
-            );
-          }
-          if (part === '[2]') {
-            return (
-              <span key={idx} className="inline-block px-1">
-                <input
-                  aria-label="Điền khuyết cụm từ 2"
+                  aria-label={`Điền khuyết cụm từ ${slotNum}`}
                   className="w-44 px-space-sm py-1 rounded-lg bg-surface-container text-primary font-bold focus:outline-none focus:ring-2 focus:ring-secondary text-center"
-                  placeholder="(điền cụm từ 2)"
+                  placeholder={`(điền vị trí ${slotNum})`}
                   type="text"
-                  value={fillBlanks[1]}
-                  onChange={(e) => onChangeFillBlank(1, e.target.value)}
-                />
-              </span>
-            );
-          }
-          if (part === '[3]') {
-            return (
-              <span key={idx} className="inline-block px-1">
-                <input
-                  aria-label="Điền khuyết cụm từ 3"
-                  className="w-40 px-space-sm py-1 rounded-lg bg-surface-container text-primary font-bold focus:outline-none focus:ring-2 focus:ring-secondary text-center"
-                  placeholder="(điền cụm từ 3)"
-                  type="text"
-                  value={fillBlanks[2]}
-                  onChange={(e) => onChangeFillBlank(2, e.target.value)}
+                  value={fillBlanks[slotIdx] || ''}
+                  onChange={(e) => onChangeFillBlank(slotIdx, e.target.value)}
                 />
               </span>
             );
@@ -409,29 +403,32 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
           {/* CỘT TRÁI (lg:col-span-8): NỘI DUNG ĐỀ THI */}
           <div className="lg:col-span-8 flex flex-col gap-space-xl">
             {/* THÔNG TIN PHẦN 1: TRẮC NGHIỆM KHÁCH QUAN */}
-            <div className="bg-surface-container-low p-space-lg rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-space-md">
-                <div className="w-10 h-10 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-headline-sm text-headline-sm">
-                  I
+            {hasMcq && (
+              <div className="bg-surface-container-low p-space-lg rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-space-md">
+                  <div className="w-10 h-10 rounded-lg bg-primary-container text-on-primary flex items-center justify-center font-headline-sm text-headline-sm">
+                    I
+                  </div>
+                  <div>
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                      PHẦN 1: CÂU HỎI TRẮC NGHIỆM ({mcqList.length} CÂU)
+                    </h2>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Chọn 01 phương án đúng nhất trong các đáp án A, B, C, D
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">
-                    PHẦN 1: CÂU HỎI TRẮC NGHIỆM ({mcqList.length} CÂU)
-                  </h2>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Chọn 01 phương án đúng nhất trong các đáp án A, B, C, D
-                  </p>
-                </div>
+                <span className="font-code-meta text-code-meta bg-surface-container-high px-space-sm py-1 rounded text-primary font-bold">
+                  {Math.max(
+                    0,
+                    10 -
+                      (hasFill ? Number(exam.fillQuestion?.points) || 0 : 0) -
+                      (hasShort ? Number(exam.shortQuestion?.points) || 0 : 0)
+                  ).toFixed(1)}{' '}
+                  ĐIỂM
+                </span>
               </div>
-              <span className="font-code-meta text-code-meta bg-surface-container-high px-space-sm py-1 rounded text-primary font-bold">
-                {(
-                  10 -
-                  (exam.fillQuestion?.points || 2) -
-                  (exam.shortQuestion?.points || 3)
-                ).toFixed(1)}{' '}
-                ĐIỂM
-              </span>
-            </div>
+            )}
 
             {/* DANH SÁCH CÂU TRẮC NGHIỆM */}
             {displayedMcqs.map((q) => {
@@ -551,28 +548,34 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
             })}
 
             {/* THÔNG TIN PHẦN 2: ĐIỀN KHUYẾT & TỰ LUẬN TRẢ LỜI NGẮN */}
-            <div className="bg-surface-container-low p-space-lg rounded-xl flex items-center justify-between mt-space-md">
-              <div className="flex items-center gap-space-md">
-                <div className="w-10 h-10 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center font-headline-sm text-headline-sm">
-                  II
+            {(hasFill || hasShort) && (
+              <div className="bg-surface-container-low p-space-lg rounded-xl flex items-center justify-between mt-space-md">
+                <div className="flex items-center gap-space-md">
+                  <div className="w-10 h-10 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center font-headline-sm text-headline-sm">
+                    {hasMcq ? 'II' : 'I'}
+                  </div>
+                  <div>
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface">
+                      {hasFill && hasShort
+                        ? 'PHẦN TỰ LUẬN: ĐIỀN KHUYẾT & TỰ LUẬN / TRẢ LỜI NGẮN'
+                        : hasFill
+                        ? 'PHẦN ĐIỀN KHUYẾT'
+                        : 'PHẦN TỰ LUẬN / TRẢ LỜI NGẮN'}
+                    </h2>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Thí sinh nhập trực tiếp nội dung vào trường tương ứng
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">
-                    PHẦN 2: ĐIỀN KHUYẾT &amp; SUY LUẬN NGẮN
-                  </h2>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">
-                    Thí sinh nhập trực tiếp nội dung vào trường tương ứng
-                  </p>
-                </div>
+                <span className="font-code-meta text-code-meta bg-surface-container-high px-space-sm py-1 rounded text-secondary font-bold">
+                  {(
+                    (hasFill ? Number(exam.fillQuestion?.points) || 0 : 0) +
+                    (hasShort ? Number(exam.shortQuestion?.points) || 0 : 0)
+                  ).toFixed(1)}{' '}
+                  ĐIỂM
+                </span>
               </div>
-              <span className="font-code-meta text-code-meta bg-surface-container-high px-space-sm py-1 rounded text-secondary font-bold">
-                {(
-                  (exam.fillQuestion?.points || 2) +
-                  (exam.shortQuestion?.points || 3)
-                ).toFixed(1)}{' '}
-                ĐIỂM
-              </span>
-            </div>
+            )}
 
             {/* CÂU ĐIỀN KHUYẾT */}
             {showFillQ && (
@@ -640,7 +643,7 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
                     info
                   </span>
                   <span>
-                    Hướng dẫn: Gõ từ ngữ chính xác thích hợp nhất vào 3 ô trống bên dưới.
+                    Hướng dẫn: Gõ từ ngữ chính xác thích hợp nhất vào {expectedBlankCount} ô trống bên dưới.
                   </span>
                 </div>
 
@@ -806,85 +809,97 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
               </div>
 
               {/* Lưới nút câu hỏi trắc nghiệm */}
-              <div className="flex flex-col gap-space-sm">
-                <span className="font-code-meta text-code-meta text-outline uppercase tracking-wider font-semibold">
-                  Phần I: Trắc nghiệm (1 - {mcqList.length})
-                </span>
-                <div className="grid grid-cols-5 gap-space-sm">
-                  {mcqList.map((q) => {
-                    const isFocused = activeQuestion === q.id;
-                    const isDone = Boolean(selectedAnswers[q.id]);
-                    const isFlagged = flaggedQuestions.includes(q.id);
-                    const label = q.id < 10 ? `0${q.id}` : `${q.id}`;
+              {hasMcq && (
+                <div className="flex flex-col gap-space-sm">
+                  <span className="font-code-meta text-code-meta text-outline uppercase tracking-wider font-semibold">
+                    Phần I: Trắc nghiệm (1 - {mcqList.length})
+                  </span>
+                  <div className="grid grid-cols-5 gap-space-sm">
+                    {mcqList.map((q) => {
+                      const isFocused = activeQuestion === q.id;
+                      const isDone = Boolean(selectedAnswers[q.id]);
+                      const isFlagged = flaggedQuestions.includes(q.id);
+                      const label = q.id < 10 ? `0${q.id}` : `${q.id}`;
 
-                    return (
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          onClick={() => scrollToQuestion(q.id)}
+                          className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center relative hover:scale-105 transition-transform shadow-sm cursor-pointer ${
+                            isFocused
+                              ? 'bg-secondary text-on-secondary ring-2 ring-primary'
+                              : isDone
+                              ? 'bg-primary text-on-primary'
+                              : 'bg-surface-container-high text-on-surface-variant'
+                          }`}
+                        >
+                          {label}
+                          {isFlagged && (
+                            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-error rounded-full flex items-center justify-center">
+                              <span className="material-symbols-outlined material-symbols-filled text-on-error text-[10px]">
+                                flag
+                              </span>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Phần II: Điền Khuyết & Tự Luận */}
+              {(hasFill || hasShort) && (
+                <div className="flex flex-col gap-space-sm pt-space-xs">
+                  <span className="font-code-meta text-code-meta text-outline uppercase tracking-wider font-semibold">
+                    {hasFill && hasShort
+                      ? 'Phần II: Điền Khuyết & Tự Luận'
+                      : hasFill
+                      ? 'Câu Điền Khuyết'
+                      : 'Câu Tự Luận / Trả Lời Ngắn'}
+                  </span>
+                  <div className="grid grid-cols-2 gap-space-sm">
+                    {hasFill && (
                       <button
-                        key={q.id}
                         type="button"
-                        onClick={() => scrollToQuestion(q.id)}
-                        className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center relative hover:scale-105 transition-transform shadow-sm cursor-pointer ${
-                          isFocused
+                        onClick={() => scrollToQuestion(fillQuestionNumber)}
+                        className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-space-xs hover:scale-105 transition-transform shadow-sm cursor-pointer relative ${
+                          activeQuestion === fillQuestionNumber
                             ? 'bg-secondary text-on-secondary ring-2 ring-primary'
-                            : isDone
+                            : isFillCompleted
                             ? 'bg-primary text-on-primary'
                             : 'bg-surface-container-high text-on-surface-variant'
                         }`}
                       >
-                        {label}
-                        {isFlagged && (
-                          <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-error rounded-full flex items-center justify-center">
-                            <span className="material-symbols-outlined material-symbols-filled text-on-error text-[10px]">
-                              flag
-                            </span>
-                          </span>
-                        )}
+                        <span>{fillQuestionNumber}</span>
+                        <span className="font-label-md text-label-md opacity-80 font-normal">
+                          (Điền)
+                        </span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                    )}
 
-              {/* Phần II: Điền Khuyết & Tự Luận */}
-              <div className="flex flex-col gap-space-sm pt-space-xs">
-                <span className="font-code-meta text-code-meta text-outline uppercase tracking-wider font-semibold">
-                  Phần II: Điền Khuyết &amp; Tự Luận
-                </span>
-                <div className="grid grid-cols-2 gap-space-sm">
-                  <button
-                    type="button"
-                    onClick={() => scrollToQuestion(fillQuestionNumber)}
-                    className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-space-xs hover:scale-105 transition-transform shadow-sm cursor-pointer relative ${
-                      activeQuestion === fillQuestionNumber
-                        ? 'bg-secondary text-on-secondary ring-2 ring-primary'
-                        : isFillCompleted
-                        ? 'bg-primary text-on-primary'
-                        : 'bg-surface-container-high text-on-surface-variant'
-                    }`}
-                  >
-                    <span>{fillQuestionNumber}</span>
-                    <span className="font-label-md text-label-md opacity-80 font-normal">
-                      (Điền)
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => scrollToQuestion(shortQuestionNumber)}
-                    className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-space-xs hover:scale-105 transition-transform cursor-pointer relative ${
-                      activeQuestion === shortQuestionNumber
-                        ? 'bg-secondary text-on-secondary ring-2 ring-primary'
-                        : isShortCompleted
-                        ? 'bg-primary text-on-primary shadow-sm'
-                        : 'bg-surface-container-high text-on-surface-variant'
-                    }`}
-                  >
-                    <span>{shortQuestionNumber}</span>
-                    <span className="font-label-md text-label-md opacity-80 font-normal">
-                      (Tự luận)
-                    </span>
-                  </button>
+                    {hasShort && (
+                      <button
+                        type="button"
+                        onClick={() => scrollToQuestion(shortQuestionNumber)}
+                        className={`h-11 rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-space-xs hover:scale-105 transition-transform cursor-pointer relative ${
+                          activeQuestion === shortQuestionNumber
+                            ? 'bg-secondary text-on-secondary ring-2 ring-primary'
+                            : isShortCompleted
+                            ? 'bg-primary text-on-primary shadow-sm'
+                            : 'bg-surface-container-high text-on-surface-variant'
+                        }`}
+                      >
+                        <span>{shortQuestionNumber}</span>
+                        <span className="font-label-md text-label-md opacity-80 font-normal">
+                          (Tự luận)
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* NÚT LỌC CÂU GẮN CỜ */}
               <div className="pt-space-xs">

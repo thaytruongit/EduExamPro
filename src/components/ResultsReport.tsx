@@ -25,8 +25,9 @@ interface ResultsReportProps {
   currentTeacher?: TeacherAccount | null;
   cloudExams?: ExamBankData[];
   selectedAnswers: Record<number, 'A' | 'B' | 'C' | 'D'>;
-  fillBlanks: [string, string, string];
+  fillBlanks: string[];
   shortAnswer: string;
+  shortAnswerFeedback?: string;
   rawScore: number;
   tabPenalty: number;
   finalScore: number;
@@ -48,6 +49,7 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
   selectedAnswers,
   fillBlanks,
   shortAnswer,
+  shortAnswerFeedback = '',
   rawScore,
   tabPenalty,
   finalScore,
@@ -296,7 +298,7 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
                       </span>
                     </div>
                     <p className="font-body-sm text-[13px] text-on-surface-variant mt-1">
-                      Đã đối chiếu đáp án chuẩn môn {registration.selectedSubject}
+                      Đã hoàn thành bài kiểm tra môn {registration.selectedSubject}
                     </p>
                   </div>
                 </div>
@@ -392,76 +394,136 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
                 </div>
               )}
 
-              {/* Detailed Breakdown of current student's answers */}
-              <div className="pt-2 border-t border-outline-variant/30">
-                <h3 className="font-headline-sm text-headline-sm text-primary mb-3">
-                  Đối Chiếu Bài Làm Của Thí Sinh ({exam.questions.length} câu trắc nghiệm &amp; 2 câu tự luận)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {exam.questions.map((q) => {
-                    const userChoice = selectedAnswers[q.id];
-                    const isCorrect = userChoice === q.correctAnswer;
-                    return (
-                      <div
-                        key={q.id}
-                        className={`p-3 rounded-lg border flex flex-col gap-1 ${
-                          isCorrect
-                            ? 'bg-tertiary-container/10 border-tertiary/30'
-                            : 'bg-error-container/20 border-error/30'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-xs font-code-meta">
-                          <span className="font-bold text-primary">
-                            Câu {q.id} [{q.subject}]
-                          </span>
-                          <span
-                            className={
+              {/* Detailed Breakdown of student's answers (Only visible to Admin/Teachers, hidden from students after exam completion) */}
+              {isAdminAuthenticated ? (
+                <div className="pt-2 border-t border-outline-variant/30">
+                  <h3 className="font-headline-sm text-headline-sm text-primary mb-3">
+                    Đối Chiếu Bài Làm Của Thí Sinh (
+                    {[
+                      exam.questions.length > 0
+                        ? `${exam.questions.length} câu trắc nghiệm`
+                        : '',
+                      exam.fillQuestion?.points > 0 &&
+                      exam.fillQuestion?.promptTemplate?.trim()
+                        ? '1 bài điền khuyết'
+                        : '',
+                      exam.shortQuestion?.points > 0 &&
+                      exam.shortQuestion?.prompt?.trim()
+                        ? '1 bài tự luận'
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' • ')}
+                    )
+                  </h3>
+                  {exam.questions.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {exam.questions.map((q) => {
+                        const userChoice = selectedAnswers[q.id];
+                        const isCorrect = userChoice === q.correctAnswer;
+                        return (
+                          <div
+                            key={q.id}
+                            className={`p-3 rounded-lg border flex flex-col gap-1 ${
                               isCorrect
-                                ? 'text-on-tertiary-container font-bold'
-                                : 'text-error font-bold'
-                            }
+                                ? 'bg-tertiary-container/10 border-tertiary/30'
+                                : 'bg-error-container/20 border-error/30'
+                            }`}
                           >
-                            Chọn: {userChoice || 'Chưa chọn'} | ĐA chuẩn:{' '}
-                            {q.correctAnswer}
-                          </span>
-                        </div>
-                        <p className="font-body-sm text-body-sm text-on-surface">
-                          {q.prompt}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                  <div className="p-3 rounded-lg bg-surface-container-low text-xs">
-                    <strong className="text-primary block mb-1">
-                      Câu Điền Khuyết ({exam.fillQuestion.points}đ):
-                    </strong>
-                    <div>
-                      Thí sinh điền:{' '}
-                      <strong>
-                        {fillBlanks.map((b) => b || '...').join(' | ')}
-                      </strong>
+                            <div className="flex items-center justify-between text-xs font-code-meta">
+                              <span className="font-bold text-primary">
+                                Câu {q.id} [{q.subject}]
+                              </span>
+                              <span
+                                className={
+                                  isCorrect
+                                    ? 'text-on-tertiary-container font-bold'
+                                    : 'text-error font-bold'
+                                }
+                              >
+                                Chọn: {userChoice || 'Chưa chọn'} | ĐA chuẩn:{' '}
+                                {q.correctAnswer}
+                              </span>
+                            </div>
+                            <p className="font-body-sm text-body-sm text-on-surface">
+                              {q.prompt}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="text-on-surface-variant mt-0.5">
-                      Đáp án chuẩn:{' '}
-                      {exam.fillQuestion.blanks.join(' | ')}
+                  )}
+                  {((exam.fillQuestion?.points > 0 &&
+                    exam.fillQuestion?.promptTemplate?.trim()) ||
+                    (exam.shortQuestion?.points > 0 &&
+                      exam.shortQuestion?.prompt?.trim())) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      {exam.fillQuestion?.points > 0 &&
+                        exam.fillQuestion?.promptTemplate?.trim() && (
+                          <div className="p-3 rounded-lg bg-surface-container-low text-xs">
+                            <strong className="text-primary block mb-1">
+                              Câu Điền Khuyết ({exam.fillQuestion.points}đ):
+                            </strong>
+                            <div>
+                              Thí sinh điền:{' '}
+                              <strong>
+                                {fillBlanks.map((b) => b || '...').join(' | ')}
+                              </strong>
+                            </div>
+                            <div className="text-on-surface-variant mt-0.5">
+                              Đáp án chuẩn:{' '}
+                              {exam.fillQuestion.blanks.join(' | ')}
+                            </div>
+                          </div>
+                        )}
+                      {exam.shortQuestion?.points > 0 &&
+                        exam.shortQuestion?.prompt?.trim() && (
+                          <div className="p-3 rounded-lg bg-surface-container-low text-xs">
+                            <strong className="text-primary block mb-1">
+                              Câu Tự Luận / Trả Lời Ngắn ({exam.shortQuestion.points}đ):
+                            </strong>
+                            <div>
+                              Bài làm:{' '}
+                              <em>{shortAnswer || '(Thí sinh bỏ trống)'}</em>
+                            </div>
+                            <div className="text-on-surface-variant mt-0.5">
+                              Đáp án chuẩn: {exam.shortQuestion.sampleAnswer}
+                            </div>
+                            {shortAnswerFeedback && (
+                              <div className="mt-2.5 p-2 rounded-lg bg-primary-container/20 border border-primary/30 text-xs text-on-surface">
+                                <div className="font-bold text-primary flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[15px]">
+                                    auto_awesome
+                                  </span>
+                                  <span>Đánh giá tự động từ AI (Gemini):</span>
+                                </div>
+                                <p className="mt-1 whitespace-pre-wrap leading-relaxed text-on-surface font-medium">
+                                  {shortAnswerFeedback}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="pt-3 border-t border-outline-variant/30">
+                  <div className="p-4 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center gap-3 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-primary text-[24px]">
+                      lock
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-xs text-on-surface">
+                        Đáp án chi tiết đề thi được bảo mật
+                      </span>
+                      <span className="text-xs">
+                        Hệ thống đã ghi nhận và lưu điểm số bài thi của học sinh. Chi tiết đối chiếu đáp án không hiển thị trên trang học sinh theo quy định bảo mật đề thi.
+                      </span>
                     </div>
                   </div>
-                  <div className="p-3 rounded-lg bg-surface-container-low text-xs">
-                    <strong className="text-primary block mb-1">
-                      Câu Tự Luận Ngắn ({exam.shortQuestion.points}đ):
-                    </strong>
-                    <div>
-                      Bài làm:{' '}
-                      <em>{shortAnswer || '(Thí sinh bỏ trống)'}</em>
-                    </div>
-                    <div className="text-on-surface-variant mt-0.5">
-                      Đáp án chuẩn: {exam.shortQuestion.sampleAnswer}
-                    </div>
-                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </section>
         ) : (

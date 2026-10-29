@@ -27,6 +27,7 @@ import {
   DEFAULT_TEACHER_ACCOUNTS,
   DEFAULT_CLASSROOMS,
   DEFAULT_STUDENT_ACCOUNTS,
+  StudentAccount,
   getInitialSubjectExams,
   authenticateStudentAccount,
   authenticateTeacherAccount,
@@ -44,6 +45,8 @@ import {
   suggestTeacherUsernameFromFullName,
   getStudentScheduleReminders,
   parseFreeformExamContent,
+  scanAndParseThreeExamSections,
+  evaluateStudentSubmission,
   StudentRecord,
   TeacherAccount,
 } from './examLogic.ts';
@@ -415,14 +418,38 @@ describe('examLogic pure functions', () => {
     assert.equal(byExamId[0].name, 'Nguyễn Văn A');
   });
 
-  it('enforces grade-restricted exam visibility for students (e.g. 6A1 only sees Grade 6 exams) and class-scoped scoreboards', () => {
-    assert.ok(DEFAULT_CLASSROOMS.length >= 6);
-    assert.ok(DEFAULT_STUDENT_ACCOUNTS.length >= 6);
+  it('enforces zero demo student accounts and classes by default, and verifies student auth & grade-restricted exam visibility', () => {
+    // Verified: zero demo student accounts or hardcoded demo classrooms
+    assert.equal(DEFAULT_CLASSROOMS.length, 0);
+    assert.equal(DEFAULT_STUDENT_ACCOUNTS.length, 0);
+
+    const sampleStudentAccounts: StudentAccount[] = [
+      {
+        id: 'hs-an',
+        username: 'hs.an9a1',
+        fullName: 'Nguyễn Văn An',
+        grade: 9,
+        studentClass: '9A1',
+        dateOfBirth: '15/05/2010',
+        password: 'password123',
+        createdAt: '2026-01-01',
+      },
+      {
+        id: 'hs-mai',
+        username: 'hs.mai6a1',
+        fullName: 'Trần Thị Mai',
+        grade: 6,
+        studentClass: '6A1',
+        dateOfBirth: '08/09/2013',
+        password: 'password123',
+        createdAt: '2026-01-01',
+      },
+    ];
 
     const validStudent = authenticateStudentAccount(
-      DEFAULT_STUDENT_ACCOUNTS,
+      sampleStudentAccounts,
       'hs.an9a1',
-      '123456'
+      'password123'
     );
     assert.ok(validStudent);
     assert.equal(validStudent?.fullName, 'Nguyễn Văn An');
@@ -430,9 +457,9 @@ describe('examLogic pure functions', () => {
     assert.equal(validStudent?.dateOfBirth, '15/05/2010');
 
     const student6A1 = authenticateStudentAccount(
-      DEFAULT_STUDENT_ACCOUNTS,
+      sampleStudentAccounts,
       'hs.mai6a1',
-      '123456'
+      'password123'
     );
     assert.ok(student6A1);
     assert.equal(student6A1?.grade, 6);
@@ -543,10 +570,20 @@ describe('examLogic pure functions', () => {
       },
     ];
 
+    const sampleStudent7A1: StudentAccount = {
+      id: 'hs-huy7a1',
+      username: 'hs.huy7a1',
+      fullName: 'Vũ Quốc Huy',
+      grade: 7,
+      studentClass: '7A1',
+      dateOfBirth: '20/11/2012',
+      password: 'password123',
+      createdAt: '2026-01-01',
+    };
     const student7A1 = authenticateStudentAccount(
-      DEFAULT_STUDENT_ACCOUNTS,
+      [sampleStudent7A1],
       'hs.huy7a1',
-      '123456'
+      'password123'
     );
     assert.ok(student7A1);
 
@@ -663,6 +700,141 @@ describe('examLogic pure functions', () => {
       false
     );
   });
+
+  it('scans uploaded exam structure (MCQ, N-blank Fill-in-blank, Short/Essay) and embedded Answer Key table accurately', () => {
+    const tinHoc9ExamWithEmbeddedAnswerKey = [
+      'UBND PHƯỜNG BÌNH ĐÔNG | ĐỀ KIỂM TRA GIỮA HỌC KỲ I',
+      'TRƯỜNG THCS ĐỒNG DIỀU | NĂM HỌC 2025-2026',
+      'ĐỀ CHÍNH THỨC | MÔN: TIN HỌC 9',
+      'Thời gian: 45 phút (Không kể thời gian phát đề)',
+      'I. PHẦN TRẮC NGHIỆM: (5,0 điểm) Chọn câu trả lời đúng nhất.',
+      'Câu 1. Một số ngành nghề liên quan đến lĩnh vực tin học:',
+      'A. Quản trị mạng, bác sĩ đa khoa.',
+      'B. Thiết kế đồ họa, lập trình viên, quản trị hệ thống.',
+      'C. Kiến trúc sư xây dựng, thợ cơ khí.',
+      'D. Nông nghiệp truyền thống.',
+      'Câu 2. Thiết bị nào là bộ não của máy tính?',
+      'A. RAM   B. Bộ xử lý trung tâm (CPU)   C. Ổ cứng   D. Màn hình',
+      'Câu 3. Phần mềm mô phỏng nào hỗ trợ học tập Hình học?',
+      'A. GeoGebra   B. Word   C. Paint   D. Unikey',
+      'Câu 4. Nguồn thông tin đáng tin cậy trên Internet thường có đuôi tên miền:',
+      'A. .gov.vn, .edu.vn   B. .xyz   C. .fun   D. .top',
+      'Câu 5. Hành vi nào vi phạm pháp luật khi sử dụng Internet?',
+      'A. Học trực tuyến   B. Phát tán mã độc và tin giả   C. Tra cứu tài liệu   D. Gửi thư điện tử',
+      'Câu 6. Phần mềm mô phỏng pha màu giúp em hiểu hệ màu nào?',
+      'A. RGB và CMYK   B. Chỉ đen trắng   C. Âm thanh   D. Văn bản',
+      'Câu 7. Để tìm kiếm thông tin chính xác theo cụm từ, ta đặt từ khóa trong:',
+      'A. Dấu ngoặc đơn   B. Dấu ngoặc kép " "   C. Dấu chấm than   D. Dấu hỏi',
+      'Câu 8. Công nghệ nào cho phép gắn bộ xử lý thông minh vào thiết bị gia dụng?',
+      'A. Máy chữ cơ   B. Internet vạn vật (IoT) và vi xử lý   C. Bàn tính gảy   D. Đèn dầu',
+      'Câu 9. Khi nhận được tin nhắn trúng thưởng bất thường trên mạng xã hội, em nên:',
+      'A. Kiểm chứng nguồn tin và không bấm vào liên kết lạ   B. Chuyển tiền ngay   C. Cung cấp mật khẩu   D. Chia sẻ cho mọi người',
+      'Câu 10. Lợi ích của phần mềm mô phỏng thí nghiệm Vật lý, Hóa học là:',
+      'A. Tốn nhiều hóa chất   B. Trực quan, an toàn và thực hành nhiều lần   C. Gây cháy nổ   D. Không quan sát được',
+      'II. PHẦN TỰ LUẬN: (5,0 điểm)',
+      'Bài 1 (3,0 điểm): Điền từ/cụm từ thích hợp vào chỗ trống:',
+      '"Deepfake; Tính sử dụng được; Tính chính xác; Vi xử lý; Tính đầy đủ; Tính mới"',
+      'a) Bốn tiêu chí cơ bản để đánh giá chất lượng thông tin gồm: (1) .............., (2) .............., (3) .............. và (4) ...............',
+      'b) Bộ phận quan trọng giúp các thiết bị số hoạt động thông minh là (5) ...............',
+      'c) Công nghệ giả mạo khuôn mặt và giọng nói bằng trí tuệ nhân tạo gọi là (6) ...............',
+      'Bài 2 (2,0 điểm):',
+      'a) Kể tên hai phần mềm mô phỏng hỗ trợ học tập và nêu tác dụng của chúng.',
+      'b) Nêu một số tác động tiêu cực của công nghệ kĩ thuật số đối với đời sống con người.',
+      'ĐÁP ÁN VÀ HƯỚNG DẪN CHẤM',
+      'MÔN: TIN HỌC - KHỐI 9',
+      'I. PHẦN TRẮC NGHIỆM: (5,0 điểm) Mỗi câu đúng được 0,5 điểm.',
+      'Câu | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10',
+      'Đáp án | B | B | A | A | B | A | B | B | A | B',
+      'II. PHẦN TỰ LUẬN: (5,0 điểm)',
+      'Bài 1 (3,0 điểm): Điền đúng mỗi vị trí được 0,5 điểm.',
+      '(1) Tính mới | (2) Tính chính xác',
+      '(3) Tính đầy đủ | (4) Tính sử dụng được',
+      '(5) Vi xử lý | (6) Deepfake',
+      'Bài 2 (2,0 điểm):',
+      'a) Kể tên đúng phần mềm mô phỏng như PhET, GeoGebra, Crocodile Physics giúp quan sát trực quan.',
+      'b) Tác động tiêu cực: nghiện Internet, lừa đảo mạng, giảm tương tác trực tiếp.',
+    ].join('\n');
+
+    const scanned = scanAndParseThreeExamSections(
+      tinHoc9ExamWithEmbeddedAnswerKey,
+      8,
+      'Toán'
+    );
+    assert.equal(scanned.ok, true);
+    assert.equal(scanned.exam.grade, 9);
+    assert.equal(scanned.exam.subjectCode, 'Tin');
+    assert.equal(scanned.exam.durationMinutes, 45);
+    assert.equal(scanned.exam.questions.length, 10);
+    assert.deepEqual(
+      scanned.exam.questions.map((q) => q.correctAnswer),
+      ['B', 'B', 'A', 'A', 'B', 'A', 'B', 'B', 'A', 'B']
+    );
+    assert.equal(scanned.exam.fillQuestion.points, 3.0);
+    assert.deepEqual(scanned.exam.fillQuestion.blanks, [
+      'Tính mới',
+      'Tính chính xác',
+      'Tính đầy đủ',
+      'Tính sử dụng được',
+      'Vi xử lý',
+      'Deepfake',
+    ]);
+    assert.ok(scanned.exam.fillQuestion.promptTemplate.includes('[1]'));
+    assert.ok(scanned.exam.fillQuestion.promptTemplate.includes('[6]'));
+    assert.equal(scanned.exam.shortQuestion.points, 2.0);
+    assert.ok(scanned.exam.shortQuestion.sampleAnswer.includes('GeoGebra'));
+
+    // Evaluate a perfect student submission on this 6-blank exam
+    const evalPerfect = evaluateStudentSubmission({
+      exam: scanned.exam,
+      selectedAnswers: {
+        1: 'B',
+        2: 'B',
+        3: 'A',
+        4: 'A',
+        5: 'B',
+        6: 'A',
+        7: 'B',
+        8: 'B',
+        9: 'A',
+        10: 'B',
+      },
+      fillBlanks: [
+        'Tính mới',
+        'Tính chính xác',
+        'Tính đầy đủ',
+        'Tính sử dụng được',
+        'Vi xử lý',
+        'Deepfake',
+      ],
+      shortAnswer:
+        'Phần mềm PhET và GeoGebra giúp mô phỏng trực quan. Tác động tiêu cực là nghiện Internet và lừa đảo mạng.',
+      tabViolations: 0,
+      durationSeconds: 1200,
+    });
+    assert.equal(evalPerfect.correctMcqCount, 10);
+    assert.equal(evalPerfect.fillBlankScore, 3.0);
+    assert.ok(evalPerfect.finalScore >= 9.0);
+
+    // Verify "quét được loại nào thì dùng loại đó làm đề": MCQ-only exam should NOT fabricate fill-in-blank or essay sections
+    const mcqOnlyText = [
+      'ĐỀ KIỂM TRA 15 PHÚT MÔN TOÁN 7',
+      'Câu 1. Kết quả của phép tính 2 + 3 là:',
+      'A. 4   B. 5   C. 6   D. 7',
+      'Câu 2. Số đối của -5 là:',
+      'A. 5   B. -5   C. 0   D. 1',
+      'ĐÁP ÁN: 1.B 2.A',
+    ].join('\n');
+    const scannedMcqOnly = scanAndParseThreeExamSections(mcqOnlyText, 7, 'Toán');
+    assert.equal(scannedMcqOnly.ok, true);
+    assert.equal(scannedMcqOnly.exam.questions.length, 2);
+    assert.equal(scannedMcqOnly.exam.questions[0].correctAnswer, 'B');
+    assert.equal(scannedMcqOnly.exam.questions[1].correctAnswer, 'A');
+    assert.equal(scannedMcqOnly.exam.fillQuestion.points, 0);
+    assert.equal(scannedMcqOnly.exam.fillQuestion.promptTemplate, '');
+    assert.equal(scannedMcqOnly.exam.shortQuestion.points, 0);
+    assert.equal(scannedMcqOnly.exam.shortQuestion.prompt, '');
+  });
 });
+
 
 

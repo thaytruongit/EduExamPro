@@ -54,7 +54,35 @@ function extractTextFromDocxBuffer(buf: Buffer): string | null {
           compressionMethod === 8
             ? zlib.inflateRawSync(compressedSlice)
             : compressedSlice;
-        const xmlStr = xmlBuf.toString('utf8');
+        let xmlStr = xmlBuf.toString('utf8');
+        // Convert single-paragraph Word table rows (<w:tbl> -> <w:tr> -> <w:tc>) into pipe-delimited lines
+        xmlStr = xmlStr.replace(/<w:tbl\b[\s\S]*?<\/w:tbl>/gi, (tblXml) => {
+          const rows = Array.from(tblXml.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/gi));
+          const convertedRows: string[] = [];
+          for (const r of rows) {
+            const cells = Array.from(r[0].matchAll(/<w:tc\b[\s\S]*?<\/w:tc>/gi));
+            const hasMultiParaCell = cells.some((c) => {
+              const pMatches = c[0].match(/<\/w:p>/gi);
+              return pMatches && pMatches.length > 1;
+            });
+            if (hasMultiParaCell) {
+              convertedRows.push(r[0]);
+              continue;
+            }
+            const cellTexts = cells
+              .map((c) => {
+                const tMatches = Array.from(
+                  c[0].matchAll(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/gi)
+                );
+                return tMatches.map((m) => m[1]).join('').trim();
+              })
+              .filter(Boolean);
+            if (cellTexts.length > 0) {
+              convertedRows.push(`<w:p><w:r><w:t>${cellTexts.join(' | ')}</w:t></w:r></w:p>`);
+            }
+          }
+          return convertedRows.join('');
+        });
         const paragraphs = xmlStr.split(/<\/w:p>/i);
         const lines: string[] = [];
         for (const p of paragraphs) {
@@ -91,7 +119,139 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '15mb' }));
+  app.use(express.json({ limit: '50mb' }));
+
+  app.post('/api/grade-short-answer', async (req, res) => {
+    try {
+      const {
+        prompt = '',
+        requirement = '',
+        keywords = [],
+        sampleAnswer = '',
+        studentAnswer = '',
+        maxPoints = 3.0,
+      } = req.body || {};
+
+      const cleanAnswer = typeof studentAnswer === 'string' ? studentAnswer.trim() : '';
+      const pointsMax = Number(maxPoints) > 0 ? Number(maxPoints) : 3.0;
+
+      if (!cleanAnswer) {
+        res.json({
+          score: 0,
+          feedback: 'Thí sinh không làm câu tự luận ngắn (bỏ trống).',
+          keywordMatches: [],
+          gradedBy: 'auto',
+        });
+        return;
+      }
+
+      const keywordList = Array.isArray(keywords) ? keywords : [];
+      const matchedKws = keywordList.filter((kw: string) =>
+        cleanAnswer.toLowerCase().includes(kw.trim().toLowerCase())
+      );
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+        const kwRatio = keywordList.length > 0 ? matchedKws.length / keywordList.length : 0.75;
+        const calculatedScore = Number((Math.min(pointsMax, Math.max(0.5, kwRatio * pointsMax))).toFixed(2));
+        const feedback =
+          kwRatio >= 0.8
+            ? `Bài làm rất tốt, lập luận rõ ràng, đầy đủ các ý trọng tâm (${matchedKws.length}/${keywordList.length} từ khóa chuẩn).`
+            : kwRatio >= 0.5
+            ? `Bài làm cơ bản đạt yêu cầu, đã nêu được các ý chính (${matchedKws.length}/${keywordList.length} từ khóa). Cần diễn đạt mạch lạc hơn.`
+            : `Bài làm còn sơ sài, thiếu các ý trọng tâm so với đáp án mẫu (${matchedKws.length}/${keywordList.length} từ khóa). Cần ôn tập kĩ kiến thức.`;
+
+        res.json({
+          score: calculatedScore,
+          feedback,
+          keywordMatches: matchedKws,
+          gradedBy: 'fallback-ai',
+        });
+        return;
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          },
+        },
+      });
+
+      const systemPrompt = `Bạn là giám khảo khảo thí THCS Bộ Giáo dục & Đào tạo Việt Nam. Nhiệm vụ của bạn là chấm điểm câu tự luận ngắn của học sinh THCS và đưa ra nhận xét sư phạm ngắn gọn, công bằng, chuẩn xác. Thang điểm tối đa cho câu này là ${pointsMax} điểm. Hãy đánh giá dựa trên mức độ hiểu bài, độ đầy đủ của nội dung so với đáp án mẫu và từ khóa. Phản hồi bằng JSON.`;
+
+      const userPrompt = `ĐỀ BÀI: ${prompt}
+YÊU CẦU: ${requirement}
+TỪ KHÓA CẦN CÓ: ${keywordList.join(', ')}
+ĐÁP ÁN MẪU THAM KHẢO: ${sampleAnswer}
+BÀI LÀM CỦA HỌC SINH: ${cleanAnswer}
+
+Hãy chấm điểm (từ 0.0 đến ${pointsMax}) và viết nhận xét sư phạm ngắn gọn (2-3 câu) giải thích ưu điểm và điểm cần bổ sung.`;
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('AI grading request timed out')), 2500)
+      );
+
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: userPrompt,
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                score: {
+                  type: Type.NUMBER,
+                  description: `Điểm số đạt được từ 0.0 đến ${pointsMax}`,
+                },
+                feedback: {
+                  type: Type.STRING,
+                  description: 'Nhận xét sư phạm ngắn gọn 2-3 câu',
+                },
+              },
+              required: ['score', 'feedback'],
+            },
+          },
+        }),
+        timeoutPromise,
+      ]);
+
+      const parsed = JSON.parse(response.text || '{}');
+      const safeScore = Math.min(pointsMax, Math.max(0, Number(parsed.score) || 0));
+      res.json({
+        score: Number(safeScore.toFixed(2)),
+        feedback: parsed.feedback || 'Đã chấm điểm câu tự luận bằng AI.',
+        keywordMatches: matchedKws,
+        gradedBy: 'gemini-ai',
+      });
+    } catch (err) {
+      console.warn('Gemini grading fallback triggered:', err instanceof Error ? err.message : err);
+      const cleanAnswer = typeof req.body?.studentAnswer === 'string' ? req.body.studentAnswer.trim() : '';
+      const pointsMax = Number(req.body?.maxPoints) > 0 ? Number(req.body.maxPoints) : 3.0;
+      const keywordList = Array.isArray(req.body?.keywords) ? req.body.keywords : [];
+      const matchedKws = keywordList.filter((kw: string) =>
+        cleanAnswer.toLowerCase().includes(kw.trim().toLowerCase())
+      );
+      const kwRatio = keywordList.length > 0 ? matchedKws.length / keywordList.length : 0.75;
+      const calculatedScore = Number((Math.min(pointsMax, Math.max(0.5, kwRatio * pointsMax))).toFixed(2));
+      const feedback =
+        kwRatio >= 0.8
+          ? `Bài làm rất tốt, lập luận rõ ràng, đầy đủ các ý trọng tâm (${matchedKws.length}/${keywordList.length} từ khóa chuẩn).`
+          : kwRatio >= 0.5
+          ? `Bài làm cơ bản đạt yêu cầu, đã nêu được các ý chính (${matchedKws.length}/${keywordList.length} từ khóa). Cần diễn đạt mạch lạc hơn.`
+          : `Bài làm còn sơ sài, thiếu các ý trọng tâm so với đáp án mẫu (${matchedKws.length}/${keywordList.length} từ khóa). Cần ôn tập kĩ kiến thức.`;
+
+      res.json({
+        score: calculatedScore,
+        feedback,
+        keywordMatches: matchedKws,
+        gradedBy: 'fallback-ai',
+      });
+    }
+  });
 
   app.post('/api/parse-exam', async (req, res) => {
     try {
