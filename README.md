@@ -67,20 +67,11 @@ Nếu bạn muốn chạy và phát triển trên máy tính:
 
 ---
 
-## 🌐 Triển khai Full-Stack (Backend Node.js + Turso Database + AI Chấm Thi)
+## 🗄 Kết Nối Cơ Sở Dữ Liệu Đám Mây (Turso Cloud libSQL)
 
-Nếu bạn muốn chạy cả máy chủ Node.js/Express để đồng bộ Cloud Database (Turso libSQL) và tính năng AI chấm thi tự luận:
-
-1. **Deploy lên Render / Railway / VPS từ chính repo GitHub này:**
-   - **Build Command:** `npm run build`
-   - **Start Command:** `npm start`
-   - **Node Version:** `>= 20.x`
-2. **Cấu hình biến môi trường (`.env`):**
-   ```env
-   TURSO_DATABASE_URL=libsql://your-database.turso.io
-   TURSO_AUTH_TOKEN=your-turso-token
-   GEMINI_API_KEY=your-gemini-api-key
-   ```
+Dự án đã được tích hợp trực tiếp với **Turso Cloud Database (`libsql://eduexam-db-thaytruongit.aws-ap-southeast-1.turso.io`)** qua cả 2 cơ chế:
+- **Trên GitHub Pages (`@libsql/client/web`)**: Trình duyệt kết nối trực tiếp tới Turso Cloud qua giao thức HTTPS/WSS mà không cần máy chủ trung gian. Giáo viên tạo đề, thêm học sinh hay học sinh nộp bài trên link GitHub Pages đều được lưu trữ và đồng bộ tức thời trên cùng một cơ sở dữ liệu đám mây.
+- **Trên Server Node.js / Express (`@libsql/client`)**: Tự động khởi tạo bảng (`admin_config`, `exams`, `submissions`, `exam_sessions`) và đồng bộ dữ liệu song song với Turso Cloud.
 
 ---
 
@@ -89,4 +80,5 @@ Nếu bạn muốn chạy cả máy chủ Node.js/Express để đồng bộ Clo
 - ⏱ **Phòng thi chuẩn khảo thí**: Đồng hồ đếm ngược bảo lưu thời gian thực, hộp thoại xác nhận nộp bài thông minh nhắc nhở câu chưa làm.
 - 🛡 **Giám sát chống gian lận**: Phát hiện rời tab / chuyển cửa sổ, tự động trừ điểm vi phạm.
 - 📊 **Quản lý & Xuất điểm**: Bảng điểm lớp, xuất file CSV cho giáo viên lưu trữ hồ sơ học tập.
-- 🗄 **Cơ sở dữ liệu linh hoạt**: Tích hợp Turso Embedded SQLite / Turso Cloud cùng cơ chế lưu trữ ngoại tuyến (Offline Storage).
+- ☁️ **Đồng bộ Turso Cloud 100%**: Hoạt động xuyên suốt khi đẩy lên GitHub Pages lẫn chạy máy chủ cục bộ.
+
