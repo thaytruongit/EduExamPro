@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { initTursoTables } from './src/db/turso.js';
+import { tursoRouter } from './src/db/tursoRoutes.js';
 
 dotenv.config();
 
@@ -119,7 +121,15 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Initialize Turso Database tables
+  try {
+    await initTursoTables();
+  } catch (err) {
+    console.error('Turso init error:', err);
+  }
+
   app.use(express.json({ limit: '50mb' }));
+  app.use('/api/turso', tursoRouter);
 
   app.post('/api/grade-short-answer', async (req, res) => {
     try {

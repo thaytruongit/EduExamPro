@@ -19,6 +19,7 @@ import {
 import { ClassroomAndStudentManager } from './ClassroomAndStudentManager';
 import { ExamImportForm } from './ExamImportForm';
 import { LOGO_URL, PROFILE_AVATAR_URL } from './StudentHeader';
+import { TursoDatabaseManager } from './TursoDatabaseManager';
 
 interface AdminDashboardProps {
   onNavigate: (screen: ScreenId) => void;
@@ -48,6 +49,7 @@ interface AdminDashboardProps {
   onSaveStudentAccount: (student: StudentAccount) => Promise<void>;
   onBulkSaveStudentAccounts: (students: StudentAccount[]) => Promise<void>;
   onDeleteStudentAccount: (studentId: string) => Promise<void>;
+  onRestoreDefaultSystemData?: () => Promise<void>;
 }
 
 type AdminSection =
@@ -85,6 +87,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onSaveStudentAccount,
   onBulkSaveStudentAccounts,
   onDeleteStudentAccount,
+  onRestoreDefaultSystemData,
 }) => {
   // Login Gate state (Real credentials login, zero demo accounts)
   const [loginUsername, setLoginUsername] = useState<string>('');
@@ -98,6 +101,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [activeAdminNav, setActiveAdminNav] = useState<AdminSection>(
     isSystemAdmin ? 'lop-hoc-hoc-sinh' : 'ngan-hang-de'
   );
+
+  // ... (rest of state omitted)
+
   const [selectedGrade, setSelectedGrade] = useState<number>(9);
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>(
@@ -862,6 +868,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
             </div>
 
+            {/* TURSO DATABASE MANAGER BANNER */}
+            <div className="mb-space-lg">
+              <TursoDatabaseManager />
+            </div>
+
             {/* MODULE 0: CLASSROOM & STUDENT ACCOUNT ROSTER MANAGEMENT (ONLY FOR SYSTEM ADMIN) */}
             {isSystemAdmin && (
               <ClassroomAndStudentManager
@@ -873,6 +884,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 onSaveStudentAccount={onSaveStudentAccount}
                 onBulkSaveStudentAccounts={onBulkSaveStudentAccounts}
                 onDeleteStudentAccount={onDeleteStudentAccount}
+                onRestoreDefaultSystemData={onRestoreDefaultSystemData}
               />
             )}
 

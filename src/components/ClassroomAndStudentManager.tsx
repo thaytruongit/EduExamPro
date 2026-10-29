@@ -20,6 +20,7 @@ interface ClassroomAndStudentManagerProps {
   onSaveStudentAccount: (account: StudentAccount) => Promise<void>;
   onBulkSaveStudentAccounts: (accounts: StudentAccount[]) => Promise<void>;
   onDeleteStudentAccount: (accountId: string) => Promise<void>;
+  onRestoreDefaultSystemData?: () => Promise<void>;
 }
 
 export const ClassroomAndStudentManager: React.FC<
@@ -33,6 +34,7 @@ export const ClassroomAndStudentManager: React.FC<
   onSaveStudentAccount,
   onBulkSaveStudentAccounts,
   onDeleteStudentAccount,
+  onRestoreDefaultSystemData,
 }) => {
   const isAdmin = canTeacherManageSystem(currentTeacher);
 
@@ -54,7 +56,7 @@ export const ClassroomAndStudentManager: React.FC<
   const [stuFullName, setStuFullName] = useState<string>('');
   const [stuDob, setStuDob] = useState<string>('15/05/2013');
   const [stuClass, setStuClass] = useState<string>(
-    classrooms[0]?.name || '6A1'
+    classrooms[0]?.name || '6A10'
   );
   const [stuUsername, setStuUsername] = useState<string>('');
   const [stuPassword, setStuPassword] = useState<string>(() =>
@@ -65,14 +67,7 @@ export const ClassroomAndStudentManager: React.FC<
 
   // Excel Auto-Credential Import state (3 fields: Họ tên, Lớp, Ngày sinh -> Auto Tài khoản & Mật khẩu)
   const [showExcelModal, setShowExcelModal] = useState<boolean>(true);
-  const [excelRawText, setExcelRawText] = useState<string>(
-    [
-      'Họ tên\tLớp\tNgày sinh',
-      'Phạm Gia Bảo\t6A1\t14/08/2013',
-      'Nguyễn Minh Châu\t7A1\t22/11/2012',
-      'Lê Hoàng Nam\t8A1\t05/03/2011',
-    ].join('\n')
-  );
+  const [excelRawText, setExcelRawText] = useState<string>('');
   const [excelPasswordSeed, setExcelPasswordSeed] = useState<number>(2026);
   const [excelUploadedFileName, setExcelUploadedFileName] =
     useState<string>('');
@@ -80,9 +75,7 @@ export const ClassroomAndStudentManager: React.FC<
 
   // Legacy bulk import state
   const [showBulkModal, setShowBulkModal] = useState<boolean>(false);
-  const [bulkText, setBulkText] = useState<string>(
-    'Hoàng Minh Khôi | 18/04/2010 | 9A1 | hs.khoi9a1 | 123456\nLê Bảo Ngọc | 09/12/2010 | 9A2 | hs.ngoc9a2 | 123456'
-  );
+  const [bulkText, setBulkText] = useState<string>('');
 
   // Edit student password inline state
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
@@ -95,7 +88,7 @@ export const ClassroomAndStudentManager: React.FC<
   // Live preview of Excel 3-column rows with auto-generated username & password
   const excelPreviewAccounts = useMemo(() => {
     return parseExcelStudentAccountsAutoCredentials(excelRawText, {
-      fallbackClass: stuClass || '6A1',
+      fallbackClass: stuClass || '6A10',
       existingUsernames: studentAccounts.map((s) => s.username),
       seed: excelPasswordSeed,
     });
@@ -684,6 +677,32 @@ export const ClassroomAndStudentManager: React.FC<
                     </span>
                     <span>Reset Mật Khẩu Toàn Bộ HS (123456)</span>
                   </button>
+                  {onRestoreDefaultSystemData && (
+                    <button
+                      id="btnRestoreDefaultRosterData"
+                      type="button"
+                      onClick={async () => {
+                        if (
+                          window.confirm(
+                            'Xác nhận khôi phục đầy đủ danh sách Lớp học, Tài khoản Giáo viên và Học sinh mặc định từ hệ thống?'
+                          )
+                        ) {
+                          await onRestoreDefaultSystemData();
+                          setStudentNotice(
+                            'Thành công: Đã khôi phục toàn bộ dữ liệu Tài khoản Giáo viên, Học sinh và Lớp học lên Cloud Firestore!'
+                          );
+                          window.setTimeout(() => setStudentNotice(null), 5000);
+                        }
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                      title="Khôi phục danh sách Lớp học & Tài khoản mặc định"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">
+                        settings_backup_restore
+                      </span>
+                      <span>Khôi Phục TK Mặc Định</span>
+                    </button>
+                  )}
                 </>
               )}
               <button

@@ -65,36 +65,15 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(
-  error: unknown,
-  operationType: OperationType,
-  path: string | null
+  _error: unknown,
+  _operationType: OperationType,
+  _path: string | null
 ) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-    },
-    operationType,
-    path,
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  // Firestore is replaced by Turso Embedded SQLite; ignore legacy Firestore quota errors
 }
 
 export async function testFirestoreConnection(): Promise<boolean> {
-  try {
-    await getDocFromServer(doc(db, 'adminConfig', 'connection_test'));
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes('the client is offline')
-    ) {
-      console.error('Please check your Firebase configuration.');
-      return false;
-    }
-    return true;
-  }
+  // Using Turso Embedded SQLite directly; no Firestore connection test needed
+  return true;
 }
+

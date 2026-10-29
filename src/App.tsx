@@ -14,20 +14,21 @@ import { ResultsReport } from './components/ResultsReport';
 import { StudentFooter, StudentHeader } from './components/StudentHeader';
 import {
   auth,
-  collection,
-  db,
-  deleteDoc,
-  doc,
   googleProvider,
-  handleFirestoreError,
   onAuthStateChanged,
-  onSnapshot,
-  OperationType,
-  setDoc,
   signInWithPopup,
   signOut,
-  testFirestoreConnection,
 } from './firebase';
+import {
+  deleteTursoExam,
+  deleteTursoSubmission,
+  getTursoConfig,
+  getTursoExams,
+  getTursoSubmissions,
+  saveTursoExam,
+  saveTursoSubmission,
+  setTursoConfig,
+} from './utils/tursoClientApi';
 import {
   authenticateStudentAccount,
   authenticateTeacherAccount,
@@ -43,7 +44,6 @@ import {
   getInitialSubjectExams,
   isLegacyDemoTeacherAccount,
   isSystemGeneratedDemoExam,
-  normalizeSubjectKey,
   ScreenId,
   StudentAccount,
   StudentRecord,
@@ -51,15 +51,47 @@ import {
   TeacherAccount,
 } from './utils/examLogic';
 
+function ensureCleanLocalCacheV3() {
+  try {
+    if (localStorage.getItem('app_clean_init_v3') !== 'true') {
+      localStorage.removeItem('app_classrooms_backup');
+      localStorage.removeItem('app_student_accounts_backup');
+      localStorage.removeItem('app_teacher_accounts_backup');
+      localStorage.removeItem('app_exams_backup');
+      localStorage.removeItem('app_submissions_backup');
+      localStorage.setItem('app_clean_init_v3', 'true');
+    }
+  } catch {}
+}
+
 export default function App() {
+  ensureCleanLocalCacheV3();
+
   const [activeScreen, setActiveScreen] = useState<ScreenId>('cong-vao-thi');
 
-  // Classrooms & Student Account Roster state
-  const [classrooms, setClassrooms] =
-    useState<ClassroomRecord[]>(DEFAULT_CLASSROOMS);
-  const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>(
-    DEFAULT_STUDENT_ACCOUNTS
-  );
+  // Classrooms & Student Account Roster state backed by Turso Embedded SQLite
+  const [classrooms, setClassrooms] = useState<ClassroomRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('app_classrooms_backup');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_CLASSROOMS;
+  });
+
+  const [studentAccounts, setStudentAccounts] = useState<StudentAccount[]>(() => {
+    try {
+      const cached = localStorage.getItem('app_student_accounts_backup');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return DEFAULT_STUDENT_ACCOUNTS;
+  });
+
   const [loggedInStudent, setLoggedInStudent] =
     useState<StudentAccount | null>(null);
 
@@ -77,32 +109,59 @@ export default function App() {
 
   const [shortAnswerFeedback, setShortAnswerFeedback] = useState<string>('');
 
-  // Initial subject exams for all 11 subjects across all 4 grades (6, 7, 8, 9)
+  // Initial subject exams (empty by default per clean setup)
   const initialSubjectExams = useMemo(() => getInitialSubjectExams(), []);
 
-  // Cloud Firestore state: Exam Bank & Student Submissions
-  const [firestoreExams, setFirestoreExams] = useState<ExamBankData[]>([]);
-  const [purgedDemoExams, setPurgedDemoExams] = useState<boolean>(false);
+  // Exam Bank & Student Submissions backed by Turso Embedded SQLite
+  const [firestoreExams, setFirestoreExams] = useState<ExamBankData[]>(() => {
+    try {
+      const cached = localStorage.getItem('app_exams_backup');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [purgedDemoExams, setPurgedDemoExams] = useState<boolean>(true);
   const [deletedDemoExamIds, setDeletedDemoExamIds] = useState<string[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>(
-    initialSubjectExams.find((e) => e.subjectCode === 'Tin')?.id ||
-      DEFAULT_EXAM_BANK_ITEM.id
+    DEFAULT_EXAM_BANK_ITEM.id
   );
-  const [cloudSubmissions, setCloudSubmissions] = useState<StudentRecord[]>([]);
 
-  // Teacher Accounts & Authentication state (Zero demo teacher accounts)
-  const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccount[]>(
-    DEFAULT_TEACHER_ACCOUNTS
-  );
+  const [cloudSubmissions, setCloudSubmissions] = useState<StudentRecord[]>(() => {
+    try {
+      const cached = localStorage.getItem('app_submissions_backup');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  // Teacher Accounts & Authentication state
+  const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccount[]>(() => {
+    try {
+      const cached = localStorage.getItem('app_teacher_accounts_backup');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_TEACHER_ACCOUNTS;
+  });
+
   const [currentTeacher, setCurrentTeacher] = useState<TeacherAccount>(
-    DEFAULT_TEACHER_ACCOUNTS[0]
+    teacherAccounts[0] || DEFAULT_TEACHER_ACCOUNTS[0]
   );
   const [isAdminAuthenticated, setIsAdminAuthenticated] =
     useState<boolean>(false);
   const [adminUserLabel, setAdminUserLabel] = useState<string>(
     'Hội Đồng Khảo Thí THCS'
   );
-  const [adminPasscode, setAdminPasscode] = useState<string>('EduExam@2025');
+  const [adminPasscode, setAdminPasscode] = useState<string>('123');
 
   // Active Exam Room & Interrupted Session state
   const [remainingSeconds, setRemainingSeconds] = useState<number>(45 * 60);
@@ -129,276 +188,96 @@ export default function App() {
     durationSeconds: 0,
   });
 
-  // Connect to Firestore on mount
+  // Automatically connect and sync with Turso Embedded SQLite on mount
   useEffect(() => {
-    testFirestoreConnection();
+    const loadTursoData = async () => {
+      try {
+        const classroomsData = await getTursoConfig<ClassroomRecord[]>('classrooms');
+        if (Array.isArray(classroomsData) && classroomsData.length > 0) {
+          setClassrooms(classroomsData);
+          try {
+            localStorage.setItem('app_classrooms_backup', JSON.stringify(classroomsData));
+          } catch {}
+        }
 
-    // Listen to Firebase Auth state
+        const studentAccountsData = await getTursoConfig<StudentAccount[]>('studentAccounts');
+        if (Array.isArray(studentAccountsData)) {
+          setStudentAccounts(studentAccountsData);
+          try {
+            localStorage.setItem('app_student_accounts_backup', JSON.stringify(studentAccountsData));
+          } catch {}
+        }
+
+        const teachersData = await getTursoConfig<TeacherAccount[]>('teachers');
+        if (Array.isArray(teachersData) && teachersData.length > 0) {
+          setTeacherAccounts(teachersData);
+          try {
+            localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(teachersData));
+          } catch {}
+        }
+
+        const securityData = await getTursoConfig<{ passcode: string }>('security');
+        if (securityData?.passcode) {
+          setAdminPasscode(securityData.passcode);
+        }
+
+        const examBankSettingsData = await getTursoConfig<{
+          purgedDemoExams?: boolean;
+          deletedDemoExamIds?: string[];
+        }>('examBankSettings');
+        if (examBankSettingsData) {
+          if (typeof examBankSettingsData.purgedDemoExams === 'boolean') {
+            setPurgedDemoExams(examBankSettingsData.purgedDemoExams);
+          }
+          if (Array.isArray(examBankSettingsData.deletedDemoExamIds)) {
+            setDeletedDemoExamIds(examBankSettingsData.deletedDemoExamIds);
+          }
+        }
+
+        const tursoExams = await getTursoExams();
+        if (Array.isArray(tursoExams)) {
+          setFirestoreExams(tursoExams);
+          try {
+            localStorage.setItem('app_exams_backup', JSON.stringify(tursoExams));
+          } catch {}
+        }
+
+        const tursoSubmissions = await getTursoSubmissions();
+        if (Array.isArray(tursoSubmissions)) {
+          setCloudSubmissions(tursoSubmissions);
+          try {
+            localStorage.setItem('app_submissions_backup', JSON.stringify(tursoSubmissions));
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Turso sync warning:', e);
+      }
+    };
+
+    loadTursoData();
+    const interval = setInterval(loadTursoData, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Listen to Firebase Auth state (for optional Google login)
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsAdminAuthenticated(true);
         setLoggedInStudent(null);
         const label =
-          user.displayName || user.email || 'Quản Trị Viên Cloud';
+          user.displayName || user.email || 'Quản Trị Viên Hệ Thống';
         setAdminUserLabel(label);
         setCurrentTeacher((prev) => prev || DEFAULT_TEACHER_ACCOUNTS[0]);
       }
     });
 
-    // Listen to Admin security config
-    const unsubConfig = onSnapshot(
-      doc(db, 'adminConfig', 'security'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data?.passcode && typeof data.passcode === 'string') {
-            setAdminPasscode(data.passcode);
-          }
-        }
-      },
-      (err) =>
-        handleFirestoreError(err, OperationType.GET, 'adminConfig/security')
-    );
-
-    // Listen to Teacher accounts in Firestore (automatically strip any legacy demo teacher accounts)
-    const unsubTeachers = onSnapshot(
-      doc(db, 'adminConfig', 'teachers'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data?.accountsJson && typeof data.accountsJson === 'string') {
-            try {
-              const parsed = JSON.parse(data.accountsJson) as TeacherAccount[];
-              if (Array.isArray(parsed)) {
-                const byUsername = new Map<string, TeacherAccount>();
-                DEFAULT_TEACHER_ACCOUNTS.forEach((t) =>
-                  byUsername.set(t.username.toLowerCase(), t)
-                );
-                parsed.forEach((t) => {
-                  if (!isLegacyDemoTeacherAccount(t)) {
-                    byUsername.set(t.username.toLowerCase(), t);
-                  }
-                });
-                setTeacherAccounts(Array.from(byUsername.values()));
-              }
-            } catch (e) {
-              console.error('Error parsing teacher accounts:', e);
-            }
-          }
-        }
-      },
-      (err) =>
-        handleFirestoreError(err, OperationType.GET, 'adminConfig/teachers')
-    );
-
-    // Listen to Classrooms in Firestore
-    const unsubClassrooms = onSnapshot(
-      doc(db, 'adminConfig', 'classrooms'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data?.classroomsJson && typeof data.classroomsJson === 'string') {
-            try {
-              const parsed = JSON.parse(
-                data.classroomsJson
-              ) as ClassroomRecord[];
-              if (Array.isArray(parsed)) {
-                setClassrooms(parsed);
-              }
-            } catch (e) {
-              console.error('Error parsing classrooms:', e);
-            }
-          }
-        }
-      },
-      (err) =>
-        handleFirestoreError(err, OperationType.GET, 'adminConfig/classrooms')
-    );
-
-    // Listen to Student Accounts in Firestore
-    const unsubStudents = onSnapshot(
-      doc(db, 'adminConfig', 'studentAccounts'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data?.accountsJson && typeof data.accountsJson === 'string') {
-            try {
-              const parsed = JSON.parse(data.accountsJson) as StudentAccount[];
-              if (Array.isArray(parsed)) {
-                setStudentAccounts(parsed);
-              }
-            } catch (e) {
-              console.error('Error parsing student accounts:', e);
-            }
-          }
-        }
-      },
-      (err) =>
-        handleFirestoreError(
-          err,
-          OperationType.GET,
-          'adminConfig/studentAccounts'
-        )
-    );
-
-    // Listen to Exam Bank Settings (purgedDemoExams & deletedDemoExamIds)
-    const unsubExamBankSettings = onSnapshot(
-      doc(db, 'adminConfig', 'examBankSettings'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (typeof data?.purgedDemoExams === 'boolean') {
-            setPurgedDemoExams(data.purgedDemoExams);
-          }
-          if (
-            typeof data?.deletedDemoExamIdsJson === 'string' &&
-            data.deletedDemoExamIdsJson
-          ) {
-            try {
-              const parsedIds = JSON.parse(data.deletedDemoExamIdsJson);
-              if (Array.isArray(parsedIds)) {
-                setDeletedDemoExamIds(parsedIds);
-              }
-            } catch {
-              // Ignore parse error
-            }
-          }
-        }
-      },
-      (err) =>
-        handleFirestoreError(
-          err,
-          OperationType.GET,
-          'adminConfig/examBankSettings'
-        )
-    );
-
-    // Listen to Cloud Exam Bank
-    const unsubExams = onSnapshot(
-      collection(db, 'exams'),
-      (snap) => {
-        const list: ExamBankData[] = [];
-        snap.forEach((docSnap) => {
-          const d = docSnap.data();
-          try {
-            const questions = d.questionsJson
-              ? JSON.parse(d.questionsJson)
-              : DEFAULT_EXAM_BANK_ITEM.questions;
-            const fillQuestion = d.fillQuestionJson
-              ? JSON.parse(d.fillQuestionJson)
-              : DEFAULT_EXAM_BANK_ITEM.fillQuestion;
-            const shortQuestion = d.shortQuestionJson
-              ? JSON.parse(d.shortQuestionJson)
-              : DEFAULT_EXAM_BANK_ITEM.shortQuestion;
-            let assignedClasses: string[] | undefined = undefined;
-            if (Array.isArray(d.assignedClasses)) {
-              assignedClasses = d.assignedClasses;
-            } else if (
-              typeof d.assignedClassesJson === 'string' &&
-              d.assignedClassesJson
-            ) {
-              assignedClasses = JSON.parse(d.assignedClassesJson);
-            }
-
-            const matchedSubject = normalizeSubjectKey(
-              d.subjectCode || d.subject || 'Toán'
-            );
-
-            list.push({
-              id: d.id || docSnap.id,
-              code: d.code || 'TOAN-01',
-              title: d.title || 'Đề Khảo Sát THCS',
-              subject: d.subject || matchedSubject || 'Toán',
-              subjectCode: matchedSubject,
-              grade: Number(d.grade) || 9,
-              durationMinutes: Number(d.durationMinutes) || 45,
-              questions,
-              fillQuestion,
-              shortQuestion,
-              createdAt: d.createdAt || new Date().toISOString(),
-              createdBy: d.createdBy,
-              teacherId: d.teacherId,
-              teacherUsername: d.teacherUsername,
-              teacherName: d.teacherName || d.createdBy,
-              assignedClasses,
-              isActive: d.isActive !== undefined ? Boolean(d.isActive) : true,
-              isAssigned:
-                d.isAssigned !== undefined ? Boolean(d.isAssigned) : true,
-              startAt: d.startAt,
-              endAt: d.endAt,
-            });
-          } catch (e) {
-            console.error('Error parsing exam from Firestore:', e);
-          }
-        });
-
-        list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        setFirestoreExams(list);
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'exams')
-    );
-
-    // Listen to Cloud Student Submissions
-    const unsubSubmissions = onSnapshot(
-      collection(db, 'submissions'),
-      (snap) => {
-        const subs: StudentRecord[] = [];
-        snap.forEach((docSnap) => {
-          const d = docSnap.data();
-          subs.push({
-            stt: '01',
-            id: d.id || docSnap.id,
-            sbd: d.sbd || d.id,
-            studentUsername: d.studentUsername,
-            dateOfBirth: d.dateOfBirth,
-            name: d.name || 'Học sinh',
-            grade: Number(d.grade) || 9,
-            className: d.className || '9A1',
-            subject: d.subject,
-            examId: d.examId,
-            examTitle: d.examTitle,
-            teacherId: d.teacherId,
-            teacherName: d.teacherName,
-            duration: d.duration || formatTimer(Number(d.durationSeconds) || 0),
-            durationSeconds: Number(d.durationSeconds) || 0,
-            tabLeaves: Number(d.tabLeaves) || 0,
-            warningText: d.warningText || 'Tuyệt đối nghiêm túc',
-            warningType: d.warningType || 'clean',
-            rawScore: Number(d.rawScore) || 0,
-            penaltyText: d.penaltyText || '0.0',
-            finalScore: Number(d.finalScore) || 0,
-            rank: d.rank,
-            status: d.status || 'Đạt chuẩn',
-            submittedAt: d.submittedAt || '',
-          });
-        });
-
-        subs.sort((a, b) =>
-          (b.submittedAt || '').localeCompare(a.submittedAt || '')
-        );
-        setCloudSubmissions(
-          subs.map((item, idx) => ({
-            ...item,
-            stt: idx + 1 < 10 ? `0${idx + 1}` : `${idx + 1}`,
-          }))
-        );
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'submissions')
-    );
-
     return () => {
       unsubAuth();
-      unsubConfig();
-      unsubTeachers();
-      unsubClassrooms();
-      unsubStudents();
-      unsubExamBankSettings();
-      unsubExams();
-      unsubSubmissions();
     };
   }, []);
 
-  // Merge Firestore exams with initial subject exams (respecting 1-click purge of demo exams and individual demo exam deletions)
+  // Merge Turso exams with initial subject exams
   const cloudExams = useMemo(() => {
     const deletedSet = new Set(deletedDemoExamIds);
     const map = new Map<string, ExamBankData>();
@@ -440,7 +319,7 @@ export default function App() {
       effectiveStudentGrade,
       effectiveStudentClass
     );
-    return matched.length > 0 ? matched : [DEFAULT_EXAM_BANK_ITEM];
+    return matched;
   }, [
     cloudExams,
     effectiveStudentClass,
@@ -466,7 +345,6 @@ export default function App() {
     if (!matched) {
       return null;
     }
-    // Enforce strict role separation: logging in as a student logs out any teacher/admin session
     setIsAdminAuthenticated(false);
     setLoggedInStudent(matched);
     setRegistration((prev) => ({
@@ -488,17 +366,13 @@ export default function App() {
     setActiveScreen('cong-vao-thi');
   };
 
-  // Classroom & Student Account persistence handlers
+  // Classroom & Student Account persistence handlers (Turso Embedded SQLite)
   const persistClassrooms = async (nextList: ClassroomRecord[]) => {
     setClassrooms(nextList);
     try {
-      await setDoc(doc(db, 'adminConfig', 'classrooms'), {
-        classroomsJson: JSON.stringify(nextList),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'adminConfig/classrooms');
-    }
+      localStorage.setItem('app_classrooms_backup', JSON.stringify(nextList));
+    } catch {}
+    await setTursoConfig('classrooms', nextList);
   };
 
   const handleSaveClassroom = async (classroom: ClassroomRecord) => {
@@ -509,7 +383,7 @@ export default function App() {
           c.name.toUpperCase() !== classroom.name.toUpperCase()
       ),
       classroom,
-    ].sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name));
+    ].sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, undefined, { numeric: true }));
     await persistClassrooms(nextList);
   };
 
@@ -520,6 +394,9 @@ export default function App() {
 
   const persistStudentAccounts = async (nextList: StudentAccount[]) => {
     setStudentAccounts(nextList);
+    try {
+      localStorage.setItem('app_student_accounts_backup', JSON.stringify(nextList));
+    } catch {}
     if (loggedInStudent) {
       const updatedSelf = nextList.find(
         (s) =>
@@ -530,18 +407,7 @@ export default function App() {
         setLoggedInStudent(updatedSelf);
       }
     }
-    try {
-      await setDoc(doc(db, 'adminConfig', 'studentAccounts'), {
-        accountsJson: JSON.stringify(nextList),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(
-        err,
-        OperationType.WRITE,
-        'adminConfig/studentAccounts'
-      );
-    }
+    await setTursoConfig('studentAccounts', nextList);
   };
 
   const handleSaveStudentAccount = async (student: StudentAccount) => {
@@ -594,7 +460,7 @@ export default function App() {
     });
   };
 
-  // Start a fresh exam from Student Portal (supports clicking any exam card directly)
+  // Start a fresh exam from Student Portal
   const handleStartFreshExam = (examOverride?: ExamBankData) => {
     const targetExam = examOverride || activeExam;
     if (examOverride) {
@@ -617,10 +483,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // When student switches tabs or leaves window in ExamRoom:
-  // 1. Immediately close Exam Room (return to 'cong-vao-thi')
-  // 2. Save exact remainingSeconds timestamp and answers
-  // 3. Increment tabViolations (+1 => -0.5 points upon re-entry)
   const handleTabSwitchKickOut = async (currentRemainingSeconds: number) => {
     const nextViolations = tabViolations + 1;
     const nowTimeStr = new Date().toLocaleTimeString('vi-VN');
@@ -647,49 +509,10 @@ export default function App() {
       answeredCount,
     });
 
-    // Close the Online Exam Room immediately and return to Entry Portal
     setActiveScreen('cong-vao-thi');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Persist interrupted session to Cloud Firestore
-    const studentIdentifier =
-      loggedInStudent?.username ||
-      registration.sbd.trim() ||
-      `${registration.studentClass}-${registration.selectedSubject}`;
-    const sessionKey = `${registration.grade}_${registration.studentClass}_${studentIdentifier}`
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 100);
-    if (sessionKey && registration.fullName.trim()) {
-      try {
-        await setDoc(doc(db, 'examSessions', sessionKey), {
-          sessionKey,
-          sbd: studentIdentifier,
-          fullName: registration.fullName.trim(),
-          grade: registration.grade,
-          studentClass: registration.studentClass.trim(),
-          examId: activeExam.id,
-          remainingSeconds: currentRemainingSeconds,
-          tabViolations: nextViolations,
-          kickedOutAt: nowTimeStr,
-          isKickedOut: true,
-          answersJson: JSON.stringify({
-            selectedAnswers,
-            fillBlanks,
-            shortAnswer,
-          }),
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (err) {
-        handleFirestoreError(
-          err,
-          OperationType.WRITE,
-          `examSessions/${sessionKey}`
-        );
-      }
-    }
   };
 
-  // Resume interrupted exam at the exact saved timestamp (with -0.5 penalty per re-entry applied)
   const handleResumeInterruptedExam = () => {
     if (interruptedSession) {
       setRemainingSeconds(interruptedSession.remainingSeconds);
@@ -699,7 +522,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Submit completed exam & save to Cloud Firestore
+  // Submit completed exam & save to Turso Embedded SQLite
   const handleSubmitExam = async (finalRemainingSeconds: number) => {
     const totalPossibleSecs = (activeExam.durationMinutes || 45) * 60;
     const durationSeconds = Math.max(
@@ -707,10 +530,8 @@ export default function App() {
       totalPossibleSecs - finalRemainingSeconds
     );
 
-    // Call AI short-answer grading service if question exists and student submitted text
     let aiShortScore: number | undefined = undefined;
     let aiFeedback = '';
-    let aiGradedBy: string | undefined = undefined;
 
     const shortQuest = activeExam.shortQuestion;
     const hasShortSection =
@@ -736,9 +557,6 @@ export default function App() {
           }
           if (graded.feedback) {
             aiFeedback = graded.feedback;
-          }
-          if (graded.gradedBy) {
-            aiGradedBy = graded.gradedBy;
           }
         }
       } catch (err) {
@@ -783,7 +601,6 @@ export default function App() {
       registration.sbd.trim() ||
       `${registration.studentClass}-${examSubject}`;
 
-    // Save real student submission to Cloud Firestore
     const subId = `sub_${registration.grade}_${
       registration.studentClass
     }_${studentIdentifier}_${Date.now()}`
@@ -816,57 +633,61 @@ export default function App() {
       ? 'Đã trừ điểm'
       : 'Đạt chuẩn';
 
-    try {
-      await setDoc(doc(db, 'submissions', subId), {
-        id: subId,
-        sbd: studentIdentifier,
-        studentUsername,
-        dateOfBirth: studentDob,
-        name:
-          loggedInStudent?.fullName ||
-          registration.fullName.trim() ||
-          'Học sinh',
-        grade: loggedInStudent?.grade || registration.grade,
-        className:
-          loggedInStudent?.studentClass ||
-          registration.studentClass.trim() ||
-          `${registration.grade}A1`,
-        subject: examSubject,
-        examId: activeExam.id,
-        examTitle: activeExam.title,
-        teacherId: activeExam.teacherId || '',
-        teacherName: activeExam.teacherName || activeExam.createdBy || '',
-        duration: `${formatTimer(durationSeconds)}s`,
-        durationSeconds,
-        tabLeaves: tabViolations,
-        reEntryCount: tabViolations,
-        warningText,
-        warningType,
-        rawScore: evaluated.rawScore,
-        penaltyScore: totalPenalty,
-        penaltyText,
-        finalScore: evaluated.finalScore,
-        rank: evaluated.rank,
-        status,
-        shortAnswerScore: evaluated.shortAnswerScore,
-        shortAnswerFeedback: aiFeedback,
-        shortAnswerGradedBy: aiGradedBy || 'local-rule',
-        answersJson: JSON.stringify({
-          selectedAnswers,
-          fillBlanks,
-          shortAnswer,
-        }),
-        submittedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `submissions/${subId}`);
-    }
+    const submittedAtIso = new Date().toISOString();
+    const newSubRecord: StudentRecord = {
+      stt: '01',
+      id: subId,
+      sbd: studentIdentifier,
+      studentUsername,
+      dateOfBirth: studentDob,
+      name:
+        loggedInStudent?.fullName ||
+        registration.fullName.trim() ||
+        'Học sinh',
+      grade: loggedInStudent?.grade || registration.grade,
+      className:
+        loggedInStudent?.studentClass ||
+        registration.studentClass.trim() ||
+        `${registration.grade}A10`,
+      subject: examSubject,
+      examId: activeExam.id,
+      examTitle: activeExam.title,
+      teacherId: activeExam.teacherId || '',
+      teacherName: activeExam.teacherName || activeExam.createdBy || '',
+      duration: `${formatTimer(durationSeconds)}s`,
+      durationSeconds,
+      tabLeaves: tabViolations,
+      warningText,
+      warningType,
+      rawScore: evaluated.rawScore,
+      penaltyText,
+      finalScore: evaluated.finalScore,
+      rank: evaluated.rank,
+      status,
+      submittedAt: submittedAtIso,
+      shortAnswerScore: evaluated.shortAnswerScore,
+      shortAnswerFeedback: aiFeedback,
+    };
+
+    setCloudSubmissions((prev) => {
+      const filtered = prev.filter((s) => s.id !== subId);
+      const next = [newSubRecord, ...filtered].map((item, idx) => ({
+        ...item,
+        stt: idx + 1 < 10 ? `0${idx + 1}` : `${idx + 1}`,
+      }));
+      try {
+        localStorage.setItem('app_submissions_backup', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    await saveTursoSubmission(newSubRecord);
 
     setActiveScreen('ket-qua-bang-diem');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Real Teacher & Admin authentication handler (enforces username, password, and role permissions)
+  // Real Teacher & Admin authentication handler
   const handleVerifyPasscodeLogin = (
     username: string,
     passcode: string
@@ -878,7 +699,6 @@ export default function App() {
       adminPasscode
     );
     if (matchedTeacher) {
-      // Enforce strict role separation: logging in as Teacher/Admin logs out any student session
       setLoggedInStudent(null);
       setCurrentTeacher(matchedTeacher);
       setIsAdminAuthenticated(true);
@@ -910,9 +730,7 @@ export default function App() {
   const handleAdminLogout = async () => {
     try {
       await signOut(auth);
-    } catch {
-      // Ignore if not signed in via Firebase Auth
-    }
+    } catch {}
     setIsAdminAuthenticated(false);
     setCurrentTeacher(teacherAccounts[0] || DEFAULT_TEACHER_ACCOUNTS[0]);
     setActiveScreen('cong-vao-thi');
@@ -928,15 +746,10 @@ export default function App() {
       newTeacher,
     ];
     setTeacherAccounts(nextList);
-
     try {
-      await setDoc(doc(db, 'adminConfig', 'teachers'), {
-        accountsJson: JSON.stringify(nextList),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'adminConfig/teachers');
-    }
+      localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(nextList));
+    } catch {}
+    await setTursoConfig('teachers', nextList);
   };
 
   const handleDeleteTeacherAccount = async (teacherId: string) => {
@@ -947,58 +760,37 @@ export default function App() {
     );
     setTeacherAccounts(nextList);
     try {
-      await setDoc(doc(db, 'adminConfig', 'teachers'), {
-        accountsJson: JSON.stringify(nextList),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'adminConfig/teachers');
-    }
+      localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(nextList));
+    } catch {}
+    await setTursoConfig('teachers', nextList);
   };
 
   const handleChangeAdminPasscode = async (newPasscode: string) => {
     setAdminPasscode(newPasscode);
-    try {
-      await setDoc(doc(db, 'adminConfig', 'security'), {
-        passcode: newPasscode,
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'adminConfig/security');
-    }
+    await setTursoConfig('security', { passcode: newPasscode });
   };
 
   const handleSaveExamToCloud = async (exam: ExamBankData) => {
-    try {
-      await setDoc(doc(db, 'exams', exam.id), {
-        id: exam.id,
-        code: exam.code,
-        title: exam.title,
-        subject: exam.subject,
-        subjectCode: exam.subjectCode || exam.subject,
-        grade: exam.grade,
-        durationMinutes: exam.durationMinutes,
-        questionsJson: JSON.stringify(exam.questions),
-        fillQuestionJson: JSON.stringify(exam.fillQuestion),
-        shortQuestionJson: JSON.stringify(exam.shortQuestion),
-        assignedClassesJson: JSON.stringify(exam.assignedClasses || []),
-        createdAt: exam.createdAt,
-        createdBy:
-          exam.createdBy || currentTeacher?.fullName || adminUserLabel,
-        teacherId: exam.teacherId || currentTeacher?.id || 'teacher-admin',
-        teacherUsername:
-          exam.teacherUsername || currentTeacher?.username || 'admin',
-        teacherName:
-          exam.teacherName || currentTeacher?.fullName || adminUserLabel,
-        isActive: true,
-        isAssigned: exam.isAssigned !== undefined ? exam.isAssigned : true,
-        startAt: exam.startAt || '',
-        endAt: exam.endAt || '',
-      });
-      setSelectedExamId(exam.id);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `exams/${exam.id}`);
-    }
+    const enriched: ExamBankData = {
+      ...exam,
+      createdBy: exam.createdBy || currentTeacher?.fullName || adminUserLabel,
+      teacherId: exam.teacherId || currentTeacher?.id || 'admin-master',
+      teacherUsername:
+        exam.teacherUsername || currentTeacher?.username || 'admin',
+      teacherName:
+        exam.teacherName || currentTeacher?.fullName || adminUserLabel,
+      isActive: true,
+      isAssigned: exam.isAssigned !== undefined ? exam.isAssigned : true,
+    };
+    setFirestoreExams((prev) => {
+      const next = [enriched, ...prev.filter((e) => e.id !== enriched.id)];
+      try {
+        localStorage.setItem('app_exams_backup', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    setSelectedExamId(enriched.id);
+    await saveTursoExam(enriched);
   };
 
   const persistExamBankSettings = async (
@@ -1007,19 +799,10 @@ export default function App() {
   ) => {
     setPurgedDemoExams(nextPurged);
     setDeletedDemoExamIds(nextDeletedIds);
-    try {
-      await setDoc(doc(db, 'adminConfig', 'examBankSettings'), {
-        purgedDemoExams: nextPurged,
-        deletedDemoExamIdsJson: JSON.stringify(nextDeletedIds),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      handleFirestoreError(
-        err,
-        OperationType.WRITE,
-        'adminConfig/examBankSettings'
-      );
-    }
+    await setTursoConfig('examBankSettings', {
+      purgedDemoExams: nextPurged,
+      deletedDemoExamIds: nextDeletedIds,
+    });
   };
 
   const handlePurgeAllSystemDemoExams = async (): Promise<number> => {
@@ -1029,14 +812,9 @@ export default function App() {
     const removedCount = demoExamsInCurrentPool.length;
     await persistExamBankSettings(true, []);
 
-    // Also delete any demo exam that had been saved into Firestore `exams` collection
     for (const ex of firestoreExams) {
       if (isSystemGeneratedDemoExam(ex)) {
-        try {
-          await deleteDoc(doc(db, 'exams', ex.id));
-        } catch {
-          // Ignore individual delete failure
-        }
+        await deleteTursoExam(ex.id);
       }
     }
     return removedCount;
@@ -1047,46 +825,41 @@ export default function App() {
   };
 
   const handleDeleteExamFromCloud = async (examId: string) => {
+    await deleteTursoExam(examId);
     if (isSystemGeneratedDemoExam({ id: examId })) {
       const nextDeleted = Array.from(new Set([...deletedDemoExamIds, examId]));
       await persistExamBankSettings(purgedDemoExams, nextDeleted);
     }
-    if (firestoreExams.some((e) => e.id === examId)) {
+    setFirestoreExams((prev) => {
+      const next = prev.filter((e) => e.id !== examId);
       try {
-        await deleteDoc(doc(db, 'exams', examId));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `exams/${examId}`);
-      }
-    }
+        localStorage.setItem('app_exams_backup', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleDeleteSubmissionFromCloud = async (submissionId: string) => {
-    try {
-      await deleteDoc(doc(db, 'submissions', submissionId));
-    } catch (err) {
-      handleFirestoreError(
-        err,
-        OperationType.DELETE,
-        `submissions/${submissionId}`
-      );
-    }
+    setCloudSubmissions((prev) => {
+      const next = prev.filter((s) => s.id !== submissionId);
+      try {
+        localStorage.setItem('app_submissions_backup', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    await deleteTursoSubmission(submissionId);
   };
 
   const handleNavigate = (screen: ScreenId) => {
-    // Enforce strict role separation:
-    // If Teacher/Admin is logged in, do not allow navigating to Student Portal ('cong-vao-thi')
     if (isAdminAuthenticated && screen === 'cong-vao-thi') {
       setActiveScreen('khu-vuc-quan-tri');
       return;
     }
-    // If Student is logged in, do not allow navigating to Admin/Teacher Portal ('khu-vuc-quan-tri')
     if (loggedInStudent && screen === 'khu-vuc-quan-tri') {
       setActiveScreen('cong-vao-thi');
       return;
     }
 
-    // If student is inside the active exam room and clicks to leave via header,
-    // treat it as leaving the exam room (kickout & preserve timestamp)
     if (
       activeScreen === 'phong-thi-truc-tuyen' &&
       screen !== 'phong-thi-truc-tuyen'
@@ -1101,42 +874,67 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const renderQuotaBanner = () => null;
+
+  const handleRestoreDefaultSystemData = async () => {
+    setClassrooms(DEFAULT_CLASSROOMS);
+    setStudentAccounts(DEFAULT_STUDENT_ACCOUNTS);
+    setTeacherAccounts(DEFAULT_TEACHER_ACCOUNTS);
+    setAdminPasscode('123');
+
+    try {
+      localStorage.setItem('app_classrooms_backup', JSON.stringify(DEFAULT_CLASSROOMS));
+      localStorage.setItem('app_student_accounts_backup', JSON.stringify(DEFAULT_STUDENT_ACCOUNTS));
+      localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(DEFAULT_TEACHER_ACCOUNTS));
+    } catch {}
+
+    await setTursoConfig('classrooms', DEFAULT_CLASSROOMS);
+    await setTursoConfig('studentAccounts', DEFAULT_STUDENT_ACCOUNTS);
+    await setTursoConfig('teachers', DEFAULT_TEACHER_ACCOUNTS);
+    await setTursoConfig('security', { passcode: '123' });
+  };
+
   if (activeScreen === 'khu-vuc-quan-tri') {
     return (
-      <AdminDashboard
-        onNavigate={handleNavigate}
-        isAdminAuthenticated={isAdminAuthenticated}
-        adminUserLabel={adminUserLabel}
-        adminPasscode={adminPasscode}
-        currentTeacher={currentTeacher}
-        teacherAccounts={teacherAccounts}
-        onCreateTeacherAccount={handleCreateTeacherAccount}
-        onDeleteTeacherAccount={handleDeleteTeacherAccount}
-        onVerifyPasscodeLogin={handleVerifyPasscodeLogin}
-        onGoogleAdminLogin={handleGoogleAdminLogin}
-        onAdminLogout={handleAdminLogout}
-        onChangeAdminPasscode={handleChangeAdminPasscode}
-        cloudExams={cloudExams}
-        onSaveExamToCloud={handleSaveExamToCloud}
-        onDeleteExamFromCloud={handleDeleteExamFromCloud}
-        onPurgeAllSystemDemoExams={handlePurgeAllSystemDemoExams}
-        onRestoreSystemDemoExams={handleRestoreSystemDemoExams}
-        purgedDemoExams={purgedDemoExams}
-        cloudSubmissions={cloudSubmissions}
-        onDeleteSubmissionFromCloud={handleDeleteSubmissionFromCloud}
-        classrooms={classrooms}
-        studentAccounts={studentAccounts}
-        onSaveClassroom={handleSaveClassroom}
-        onDeleteClassroom={handleDeleteClassroom}
-        onSaveStudentAccount={handleSaveStudentAccount}
-        onBulkSaveStudentAccounts={handleBulkSaveStudentAccounts}
-        onDeleteStudentAccount={handleDeleteStudentAccount}
-      />
+      <div className="min-h-screen flex flex-col bg-background font-body-md text-on-surface antialiased">
+        {renderQuotaBanner()}
+        <AdminDashboard
+          onNavigate={handleNavigate}
+          isAdminAuthenticated={isAdminAuthenticated}
+          adminUserLabel={adminUserLabel}
+          adminPasscode={adminPasscode}
+          currentTeacher={currentTeacher}
+          teacherAccounts={teacherAccounts}
+          onCreateTeacherAccount={handleCreateTeacherAccount}
+          onDeleteTeacherAccount={handleDeleteTeacherAccount}
+          onVerifyPasscodeLogin={handleVerifyPasscodeLogin}
+          onGoogleAdminLogin={handleGoogleAdminLogin}
+          onAdminLogout={handleAdminLogout}
+          onChangeAdminPasscode={handleChangeAdminPasscode}
+          cloudExams={cloudExams}
+          onSaveExamToCloud={handleSaveExamToCloud}
+          onDeleteExamFromCloud={handleDeleteExamFromCloud}
+          onPurgeAllSystemDemoExams={handlePurgeAllSystemDemoExams}
+          onRestoreSystemDemoExams={handleRestoreSystemDemoExams}
+          purgedDemoExams={purgedDemoExams}
+          cloudSubmissions={cloudSubmissions}
+          onDeleteSubmissionFromCloud={handleDeleteSubmissionFromCloud}
+          classrooms={classrooms}
+          studentAccounts={studentAccounts}
+          onSaveClassroom={handleSaveClassroom}
+          onDeleteClassroom={handleDeleteClassroom}
+          onSaveStudentAccount={handleSaveStudentAccount}
+          onBulkSaveStudentAccounts={handleBulkSaveStudentAccounts}
+          onDeleteStudentAccount={handleDeleteStudentAccount}
+          onRestoreDefaultSystemData={handleRestoreDefaultSystemData}
+        />
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-background font-body-md text-on-surface antialiased">
+      {renderQuotaBanner()}
       <StudentHeader
         activeScreen={activeScreen}
         onNavigate={handleNavigate}

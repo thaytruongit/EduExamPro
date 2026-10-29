@@ -88,35 +88,30 @@ export interface TeacherAccount {
 }
 
 export const LEGACY_DEMO_TEACHER_IDS = new Set<string>([
-  'teacher-tin',
-  'teacher-van-tuan',
-  'teacher-van-hang',
-  'teacher-van',
-  'teacher-toan',
-  'teacher-anh',
-  'teacher-su',
-  'teacher-dia',
-  'teacher-congnghe',
-  'teacher-gdcd',
-  'teacher-ly',
-  'teacher-hoa',
-  'teacher-sinh',
+  'teacher-tin-01',
+  'teacher-toan-01',
+  'teacher-van-01',
+  'teacher-anh-01',
+  'teacher-ly-01',
+  'teacher-hoa-01',
+  'teacher-sinh-01',
+  'teacher-su-01',
+  'teacher-dia-01',
+  'teacher-congnghe-01',
+  'teacher-gdcd-01',
 ]);
-
 export const LEGACY_DEMO_TEACHER_USERNAMES = new Set<string>([
   'gv.tin',
-  'gv.van.tuan',
-  'gv.van.hang',
-  'gv.van',
   'gv.toan',
+  'gv.van',
   'gv.anh',
+  'gv.ly',
+  'gv.hoa',
+  'gv.sinh',
   'gv.su',
   'gv.dia',
   'gv.congnghe',
   'gv.gdcd',
-  'gv.ly',
-  'gv.hoa',
-  'gv.sinh',
 ]);
 
 export function isLegacyDemoTeacherAccount(
@@ -126,23 +121,20 @@ export function isLegacyDemoTeacherAccount(
   if (account.id && LEGACY_DEMO_TEACHER_IDS.has(account.id)) return true;
   if (
     account.username &&
-    LEGACY_DEMO_TEACHER_USERNAMES.has(account.username.trim().toLowerCase())
+    LEGACY_DEMO_TEACHER_USERNAMES.has(account.username.toLowerCase())
   ) {
     return true;
   }
   return false;
 }
 
-// All demo teacher accounts have been removed as requested.
-// Only the master System Administrator account is initialized by default;
-// real subject teacher accounts are created and managed by the Administrator.
 export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccount[] = [
   {
     id: 'admin-master',
     username: 'admin',
     fullName: 'Ban Giám Hiệu & Quản Trị Hệ Thống',
     subject: 'ALL',
-    passcode: 'EduExam@2025',
+    passcode: '123',
     role: 'admin',
   },
 ];
@@ -156,7 +148,132 @@ export interface ClassroomRecord {
   createdAt: string;
 }
 
-export const DEFAULT_CLASSROOMS: ClassroomRecord[] = [];
+export const DEFAULT_CLASSROOMS: ClassroomRecord[] = [
+  // Khối 6: 6A10, 6A11, 6A12, 6A13
+  {
+    id: 'class-6a10',
+    name: '6A10',
+    grade: 6,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-6a11',
+    name: '6A11',
+    grade: 6,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-6a12',
+    name: '6A12',
+    grade: 6,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-6a13',
+    name: '6A13',
+    grade: 6,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  // Khối 7: 7A10, 7A11, 7A12, 7A13
+  {
+    id: 'class-7a10',
+    name: '7A10',
+    grade: 7,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-7a11',
+    name: '7A11',
+    grade: 7,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-7a12',
+    name: '7A12',
+    grade: 7,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-7a13',
+    name: '7A13',
+    grade: 7,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  // Khối 8: 8A11, 8A12, 8A13
+  {
+    id: 'class-8a11',
+    name: '8A11',
+    grade: 8,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-8a12',
+    name: '8A12',
+    grade: 8,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-8a13',
+    name: '8A13',
+    grade: 8,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  // Khối 9: 9A13, 9A14, 9A15, 9A16
+  {
+    id: 'class-9a13',
+    name: '9A13',
+    grade: 9,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-9a14',
+    name: '9A14',
+    grade: 9,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-9a15',
+    name: '9A15',
+    grade: 9,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'class-9a16',
+    name: '9A16',
+    grade: 9,
+    homeroomTeacher: '',
+    schoolYear: '2024 - 2025',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+];
 
 export interface StudentAccount {
   id: string;
@@ -1435,202 +1552,7 @@ TỪ KHÓA: ${pack.shortKeywords.join(', ')}
  * strictly sees only exams matching their exact grade.
  */
 export function getInitialSubjectExams(): ExamBankData[] {
-  const results: ExamBankData[] = [];
-  const grades = [6, 7, 8, 9];
-
-  for (const grade of grades) {
-    const defaultClassesForGrade = [`${grade}A1`, `${grade}A2`];
-
-    for (const subj of THCS_SUBJECTS) {
-      const pack = SUBJECT_TEMPLATE_PACKS[subj.key];
-      const baseParsed = parseStandardExamText(
-        generateStandardExamTemplate(grade, subj.key),
-        grade,
-        subj.key
-      );
-
-      if (subj.key === 'Tin') {
-        results.push({
-          ...baseParsed,
-          id: `default-tin-${grade}-01`,
-          code: `TIN-${grade}-01`,
-          title:
-            grade === 9
-              ? 'Đề thi môn Tin - Thầy Trường'
-              : `Đề thi môn Tin Khối ${grade} - Thầy Trường`,
-          subject: 'Tin',
-          subjectCode: 'Tin',
-          grade,
-          assignedClasses: defaultClassesForGrade,
-          createdBy: 'Thầy Trường (GV Tin học)',
-          teacherId: 'teacher-tin',
-          teacherName: 'Thầy Trường (GV Tin học)',
-          createdAt: '2025-01-03T08:00:00.000Z',
-          isActive: true,
-          isAssigned: true,
-          startAt: '2025-01-01T00:00:00.000Z',
-          endAt: '2029-12-31T23:59:00.000Z',
-        });
-        const tinVariant2 = shuffleExamQuestionsAndOptions(baseParsed, {
-          newCode: `TIN-${grade}-02`,
-          newTitle: `Đề thi môn Tin Khối ${grade} - Thầy Trường (Đề số 02)`,
-          seed: 100 + grade,
-        });
-        results.push({
-          ...tinVariant2,
-          id: `default-tin-${grade}-02`,
-          code: `TIN-${grade}-02`,
-          title: `Đề thi môn Tin Khối ${grade} - Thầy Trường (Đề số 02)`,
-          subject: 'Tin',
-          subjectCode: 'Tin',
-          grade,
-          assignedClasses: defaultClassesForGrade,
-          durationMinutes: 45,
-          createdBy: 'Thầy Trường (GV Tin học)',
-          teacherId: 'teacher-tin',
-          teacherName: 'Thầy Trường (GV Tin học)',
-          createdAt: '2025-01-02T08:00:00.000Z',
-          isActive: true,
-          isAssigned: true,
-          startAt: '2025-01-01T00:00:00.000Z',
-          endAt: '2029-12-31T23:59:00.000Z',
-        });
-        continue;
-      }
-
-      if (subj.key === 'Văn') {
-        results.push({
-          ...baseParsed,
-          id: `default-van-${grade}-01`,
-          code: `VAN-${grade}-01`,
-          title:
-            grade === 9
-              ? 'Đề thi môn Văn - Thầy Tuân'
-              : `Đề thi môn Văn Khối ${grade} - Thầy Tuân`,
-          subject: 'Văn',
-          subjectCode: 'Văn',
-          grade,
-          assignedClasses: defaultClassesForGrade,
-          createdBy: 'Thầy Tuân (GV Ngữ văn)',
-          teacherId: 'teacher-van-tuan',
-          teacherName: 'Thầy Tuân (GV Ngữ văn)',
-          createdAt: '2025-01-03T08:30:00.000Z',
-          isActive: true,
-          isAssigned: true,
-          startAt: '2025-01-01T00:00:00.000Z',
-          endAt: '2029-12-31T23:59:00.000Z',
-        });
-        const vanHangVariant = shuffleExamQuestionsAndOptions(baseParsed, {
-          newCode: `VAN-${grade}-02`,
-          newTitle:
-            grade === 9
-              ? 'Đề thi môn Văn - Cô Hằng'
-              : `Đề thi môn Văn Khối ${grade} - Cô Hằng`,
-          seed: 200 + grade,
-        });
-        results.push({
-          ...vanHangVariant,
-          id: `default-van-${grade}-02`,
-          code: `VAN-${grade}-02`,
-          title:
-            grade === 9
-              ? 'Đề thi môn Văn - Cô Hằng'
-              : `Đề thi môn Văn Khối ${grade} - Cô Hằng`,
-          subject: 'Văn',
-          subjectCode: 'Văn',
-          grade,
-          assignedClasses: defaultClassesForGrade,
-          createdBy: 'Cô Hằng (GV Ngữ văn)',
-          teacherId: 'teacher-van-hang',
-          teacherName: 'Cô Hằng (GV Ngữ văn)',
-          createdAt: '2025-01-03T07:30:00.000Z',
-          isActive: true,
-          isAssigned: true,
-          startAt: '2025-01-01T00:00:00.000Z',
-          endAt: '2029-12-31T23:59:00.000Z',
-        });
-        continue;
-      }
-
-      const shortTeacherName = pack.teacherName
-        .replace(/\s*\([^)]*\)\s*/g, '')
-        .trim();
-      results.push({
-        ...baseParsed,
-        id: `default-${subj.codePrefix.toLowerCase()}-${grade}-01`,
-        code: `${subj.codePrefix}-${grade}-01`,
-        title: `Đề thi môn ${subj.key} Khối ${grade} - ${shortTeacherName} (Đề số 01)`,
-        subject: subj.key,
-        subjectCode: subj.key,
-        grade,
-        assignedClasses: defaultClassesForGrade,
-        createdBy: pack.teacherName,
-        teacherId: pack.teacherId,
-        teacherName: pack.teacherName,
-        createdAt: '2025-01-02T08:00:00.000Z',
-        isActive: true,
-        isAssigned: true,
-        startAt: '2025-01-01T00:00:00.000Z',
-        endAt: '2029-12-31T23:59:00.000Z',
-      });
-
-      if (grade === 9) {
-        const secondVariant = shuffleExamQuestionsAndOptions(baseParsed, {
-          newCode: `${subj.codePrefix}-9-02`,
-          newTitle: `Đề thi môn ${subj.key} Khối 9 - ${shortTeacherName} (Đề số 02)`,
-          seed: 300 + subj.codePrefix.length,
-        });
-        results.push({
-          ...secondVariant,
-          id: `default-${subj.codePrefix.toLowerCase()}-9-02`,
-          code: `${subj.codePrefix}-9-02`,
-          title: `Đề thi môn ${subj.key} Khối 9 - ${shortTeacherName} (Đề số 02)`,
-          subject: subj.key,
-          subjectCode: subj.key,
-          grade: 9,
-          assignedClasses: defaultClassesForGrade,
-          createdBy: pack.teacherName,
-          teacherId: pack.teacherId,
-          teacherName: pack.teacherName,
-          createdAt: '2025-01-01T08:00:00.000Z',
-          isActive: true,
-          isAssigned: true,
-          startAt: '2025-01-01T00:00:00.000Z',
-          endAt: '2029-12-31T23:59:00.000Z',
-        });
-      }
-    }
-
-    // Add 1 upcoming scheduled exam per grade (Khối 6, 7, 8, 9) so students immediately see upcoming startAt/endAt reminders for their class
-    const upcomingToanBase = parseStandardExamText(
-      generateStandardExamTemplate(grade, 'Toán'),
-      grade,
-      'Toán'
-    );
-    const nowMs = Date.now();
-    const upcomingStartIso = new Date(nowMs + 2 * 3600 * 1000).toISOString();
-    const upcomingEndIso = new Date(nowMs + 50 * 3600 * 1000).toISOString();
-    results.push({
-      ...upcomingToanBase,
-      id: `default-upcoming-toan-${grade}`,
-      code: `TOAN-${grade}-SAP-THI`,
-      title: `Đề Kiểm Tra Định Kỳ Sắp Tới Môn Toán Khối ${grade}`,
-      subject: 'Toán',
-      subjectCode: 'Toán',
-      grade,
-      assignedClasses: defaultClassesForGrade,
-      createdBy: 'Tổ Toán - Tin THCS',
-      teacherId: 'teacher-toan',
-      teacherName: 'Tổ Toán - Tin THCS',
-      createdAt: new Date(nowMs - 1800 * 1000).toISOString(),
-      isActive: true,
-      isAssigned: true,
-      startAt: upcomingStartIso,
-      endAt: upcomingEndIso,
-    });
-  }
-
-  return results;
+  return [];
 }
 
 /**
