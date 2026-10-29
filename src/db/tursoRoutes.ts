@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { getTursoClient, getTursoConfigInfo, initTursoTables, updateTursoDbConfig } from './turso.js';
+import { Router, type Request, type Response } from 'express';
+import { getTursoClient, getTursoConfigInfo, initTursoTables, updateTursoDbConfig } from './turso.ts';
 
 export const tursoRouter = Router();
 

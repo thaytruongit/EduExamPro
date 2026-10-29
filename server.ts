@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
-import { initTursoTables } from './src/db/turso.js';
-import { tursoRouter } from './src/db/tursoRoutes.js';
+import { initTursoTables } from './src/db/turso.ts';
+import { tursoRouter } from './src/db/tursoRoutes.ts';
 
 dotenv.config();
 

@@ -132,6 +132,42 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
   const totalCompletedCount =
     mcqCompletedCount + (isFillCompleted ? 1 : 0) + (isShortCompleted ? 1 : 0);
 
+  const unansweredMcqIds = mcqList
+    .filter((q) => !selectedAnswers[q.id])
+    .map((q) => q.id);
+  const isFillUnanswered = hasFill && !isFillCompleted;
+  const isShortUnanswered = hasShort && !isShortCompleted;
+
+  const unansweredItems: { id: number; label: string; type: string }[] = [
+    ...unansweredMcqIds.map((id) => ({
+      id,
+      label: `Câu ${id}`,
+      type: 'Trắc nghiệm',
+    })),
+    ...(isFillUnanswered
+      ? [
+          {
+            id: fillQuestionNumber,
+            label: `Câu ${fillQuestionNumber}`,
+            type: 'Điền khuyết',
+          },
+        ]
+      : []),
+    ...(isShortUnanswered
+      ? [
+          {
+            id: shortQuestionNumber,
+            label: `Câu ${shortQuestionNumber}`,
+            type: 'Tự luận',
+          },
+        ]
+      : []),
+  ];
+  const unansweredCount = unansweredItems.length;
+  const completionPercentage = Math.round(
+    (totalCompletedCount / Math.max(1, totalQuestionsCount)) * 100
+  );
+
   const wordCount = countWords(shortAnswer);
 
   const initials = (registration.fullName || 'HS')
@@ -202,64 +238,198 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
 
   return (
     <div className="flex flex-col w-full">
-      {/* MODAL XÁC NHẬN NỘP BÀI */}
+      {/* MODAL XÁC NHẬN NỘP BÀI (CONFIRM DIALOG) */}
       {showSubmitModal && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="submit-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/60 backdrop-blur-sm p-space-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/70 backdrop-blur-sm p-space-md overflow-y-auto"
           id="submit-confirm-modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowSubmitModal(false);
+          }}
         >
-          <div className="bg-surface-container-lowest max-w-lg w-full p-space-xl rounded-xl shadow-2xl flex flex-col gap-space-md">
-            <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[28px]">
-                assignment_turned_in
+          <div className="relative bg-surface-container-lowest max-w-lg w-full p-6 sm:p-8 rounded-2xl shadow-2xl border border-outline-variant/30 flex flex-col gap-5 my-8">
+            {/* Nút đóng modal */}
+            <button
+              type="button"
+              onClick={() => setShowSubmitModal(false)}
+              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer"
+              title="Đóng (Tiếp tục làm bài)"
+              aria-label="Đóng hộp thoại"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                close
               </span>
-            </div>
-            <div>
-              <h3
-                id="submit-modal-title"
-                className="font-headline-sm text-headline-sm text-on-surface"
+            </button>
+
+            {/* Header Dialog với biểu tượng & tiêu đề cảnh báo trực quan */}
+            <div className="flex items-start gap-4">
+              <div
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                  unansweredCount > 0
+                    ? 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                    : remainingSeconds > 180
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
+                }`}
               >
-                Xác nhận nộp bài thi &amp; Lưu điểm Cloud?
-              </h3>
-              <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
-                Bạn đã hoàn thành{' '}
-                <strong className="text-primary font-bold">
-                  {totalCompletedCount}/{totalQuestionsCount}
-                </strong>{' '}
-                câu hỏi. Sau khi nộp, hệ thống sẽ chấm tự động và lưu vào Bảng điểm Lớp{' '}
-                <strong>{registration.studentClass}</strong>.
-              </p>
+                <span className="material-symbols-outlined text-[32px]">
+                  {unansweredCount > 0
+                    ? 'warning'
+                    : remainingSeconds > 180
+                    ? 'hourglass_top'
+                    : 'assignment_turned_in'}
+                </span>
+              </div>
+              <div className="flex-1 pr-6">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`font-code-meta text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                      unansweredCount > 0
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    {unansweredCount > 0
+                      ? `Còn ${unansweredCount} câu chưa làm`
+                      : 'Đã hoàn thành 100%'}
+                  </span>
+                  <span className="font-code-meta text-[11px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded">
+                    Còn {formatTimer(remainingSeconds)}
+                  </span>
+                </div>
+                <h3
+                  id="submit-modal-title"
+                  className="font-headline-sm text-headline-sm text-on-surface font-bold mt-1 leading-snug"
+                >
+                  {unansweredCount > 0
+                    ? 'Bạn có chắc chắn muốn nộp bài sớm?'
+                    : remainingSeconds > 180
+                    ? 'Thời gian làm bài vẫn còn nhiều!'
+                    : 'Xác nhận hoàn thành & nộp bài thi?'}
+                </h3>
+              </div>
             </div>
-            <div className="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs font-code-meta text-code-meta">
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Số câu đã trả lời:</span>
+
+            {/* Cảnh báo chi tiết nếu còn câu chưa làm hoặc còn nhiều thời gian */}
+            {unansweredCount > 0 ? (
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3.5 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-amber-900 font-semibold text-xs">
+                  <span className="material-symbols-outlined text-amber-600 text-[18px]">
+                    error
+                  </span>
+                  <span>
+                    Bạn còn <strong>{unansweredCount} câu hỏi</strong> chưa điền
+                    đáp án:
+                  </span>
+                </div>
+                {/* Danh sách các câu chưa làm - Nhấn để chuyển thẳng tới câu đó */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5 max-h-28 overflow-y-auto">
+                  {unansweredItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setShowSubmitModal(false);
+                        scrollToQuestion(item.id);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white text-amber-900 border border-amber-300 text-xs font-semibold hover:bg-amber-100 hover:border-amber-400 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                      title={`Nhấn để quay lại làm ${item.label}`}
+                    >
+                      <span>{item.label}</span>
+                      <span className="text-[10px] text-amber-700 font-normal">
+                        ({item.type})
+                      </span>
+                      <span className="material-symbols-outlined text-[13px] text-amber-600">
+                        arrow_forward
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : remainingSeconds > 180 ? (
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-on-surface">
+                <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">
+                  info
+                </span>
+                <div>
+                  Thời gian làm bài còn{' '}
+                  <strong className="text-primary font-bold">
+                    {Math.floor(remainingSeconds / 60)} phút{' '}
+                    {remainingSeconds % 60} giây
+                  </strong>
+                  . Thầy/Cô khuyên bạn nên tận dụng thời gian để soát lại bài kỹ
+                  càng trước khi quyết định nộp.
+                </div>
+              </div>
+            ) : null}
+
+            {/* Thống kê tiến độ bài thi */}
+            <div className="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs font-code-meta text-code-meta">
+              <div className="flex justify-between items-center text-on-surface-variant pb-1">
+                <span className="font-semibold">Tiến độ làm bài:</span>
+                <span className="text-on-surface font-bold text-sm">
+                  {totalCompletedCount} / {totalQuestionsCount} câu (
+                  {completionPercentage}%)
+                </span>
+              </div>
+              {/* Thanh tiến độ trực quan */}
+              <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    completionPercentage === 100
+                      ? 'bg-emerald-500'
+                      : 'bg-primary'
+                  }`}
+                  style={{ width: `${completionPercentage}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
+                <span>Thí sinh:</span>
                 <span className="text-on-surface font-bold">
-                  {totalCompletedCount} / {totalQuestionsCount}
+                  {registration.fullName} - Lớp {registration.studentClass}
                 </span>
               </div>
               <div className="flex justify-between text-on-surface-variant">
                 <span>Thời gian còn lại:</span>
                 <span className="text-primary font-bold">
-                  {Math.floor(remainingSeconds / 60)} phút{' '}
-                  {remainingSeconds % 60} giây
+                  {formatTimer(remainingSeconds)}
                 </span>
               </div>
-              <div className="flex justify-between text-error font-bold">
-                <span>Điểm phạt chuyển tab / vào thi lại ({tabViolations} lần):</span>
-                <span>-{(tabViolations * 0.5).toFixed(1)} điểm</span>
-              </div>
+              {tabViolations > 0 && (
+                <div className="flex justify-between text-error font-bold">
+                  <span>Trừ điểm chuyển tab ({tabViolations} lần):</span>
+                  <span>-{(tabViolations * 0.5).toFixed(1)} điểm</span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-end gap-space-sm pt-space-xs">
+
+            {/* Lưu ý khoá kết quả không thể sửa đổi */}
+            <div className="flex items-start gap-2 text-[12px] text-on-surface-variant bg-surface-container-lowest border border-outline-variant/30 p-2.5 rounded-lg">
+              <span className="material-symbols-outlined text-outline text-[16px] shrink-0 mt-0.5">
+                lock
+              </span>
+              <span>
+                Sau khi bấm xác nhận nộp, hệ thống sẽ chốt bài ngay, tính điểm
+                tự động và lưu vào cơ sở dữ liệu. Bạn{' '}
+                <strong>không thể chỉnh sửa lại đáp án</strong>.
+              </span>
+            </div>
+
+            {/* Các nút hành động: Ưu tiên nút Tiếp tục làm bài */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-space-sm pt-space-xs">
               <button
                 type="button"
                 onClick={() => setShowSubmitModal(false)}
-                className="px-space-md py-space-sm bg-surface-container-high text-on-surface font-label-lg text-label-lg rounded-lg hover:bg-surface-variant transition-colors cursor-pointer"
+                className="px-space-md py-space-sm bg-surface-container-high hover:bg-surface-variant text-on-surface font-label-lg text-label-lg rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 id="btn-cancel-submit"
               >
-                Tiếp tục làm bài
+                <span className="material-symbols-outlined text-[18px]">
+                  edit_note
+                </span>
+                <span>Tiếp tục làm bài</span>
               </button>
               <button
                 type="button"
@@ -267,13 +437,21 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
                   setShowSubmitModal(false);
                   onSubmitExam(remainingSeconds);
                 }}
-                className="px-space-lg py-space-sm bg-primary text-on-primary font-label-lg text-label-lg rounded-lg shadow-md hover:bg-primary-container transition-all flex items-center gap-space-xs cursor-pointer"
+                className={`px-space-lg py-space-sm font-label-lg text-label-lg rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer font-bold ${
+                  unansweredCount > 0
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-primary hover:bg-primary-container text-on-primary'
+                }`}
                 id="btn-confirm-submit"
               >
                 <span className="material-symbols-outlined text-[18px]">
-                  send
+                  check_circle
                 </span>
-                <span>Đồng ý nộp bài</span>
+                <span>
+                  {unansweredCount > 0
+                    ? 'Vẫn xác nhận nộp bài'
+                    : 'Xác nhận nộp bài ngay'}
+                </span>
               </button>
             </div>
           </div>
@@ -367,6 +545,20 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({
                   Chuyển tab = Đóng phòng ngay (-0.5đ)
                 </span>
               </div>
+            </button>
+
+            {/* Nút Nộp bài trên header */}
+            <button
+              type="button"
+              id="btn-header-submit-exam"
+              onClick={() => setShowSubmitModal(true)}
+              className="flex items-center gap-space-xs bg-primary hover:bg-primary-container text-on-primary px-space-md py-space-sm rounded-xl font-label-lg text-label-lg shadow-sm hover:shadow active:scale-95 transition-all cursor-pointer font-bold"
+              title="Mở hộp thoại xác nhận nộp bài thi"
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                task_alt
+              </span>
+              <span>Nộp bài</span>
             </button>
           </div>
         </div>

@@ -1003,6 +1003,7 @@ export default function App() {
             loggedInStudent={loggedInStudent}
             isAdminAuthenticated={isAdminAuthenticated}
             currentTeacher={currentTeacher}
+            classrooms={classrooms}
             onNavigate={handleNavigate}
           />
         )}

@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+.aistudio/
+server.js

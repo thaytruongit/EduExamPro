@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   canTeacherManageSystem,
+  ClassroomRecord,
   ExamBankData,
+  exportSubmissionsToCsvString,
   filterSubmissionsByAccountScope,
   formatTimer,
   getTeacherAssignedClasses,
@@ -24,6 +26,7 @@ interface ResultsReportProps {
   isAdminAuthenticated?: boolean;
   currentTeacher?: TeacherAccount | null;
   cloudExams?: ExamBankData[];
+  classrooms?: ClassroomRecord[];
   selectedAnswers: Record<number, 'A' | 'B' | 'C' | 'D'>;
   fillBlanks: string[];
   shortAnswer: string;
@@ -46,6 +49,7 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
   isAdminAuthenticated = false,
   currentTeacher = null,
   cloudExams = [],
+  classrooms = [],
   selectedAnswers,
   fillBlanks,
   shortAnswer,
@@ -75,6 +79,7 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
   const [filterClass, setFilterClass] = useState<string>('ALL');
   const [filterSubject, setFilterSubject] = useState<string>('ALL');
   const [pdfNotice, setPdfNotice] = useState<string | null>(null);
+  const [csvNotice, setCsvNotice] = useState<string | null>(null);
 
   // Step 1: Strictly scope submissions by logged-in account (Student / Teacher / Admin)
   const accountScopedSubmissions = isSystemAdmin
@@ -91,6 +96,22 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
         student: loggedInStudent,
       })
     : [];
+
+  // Compute available class names for the active grade from configured classrooms + existing records
+  const availableClassNames = useMemo(() => {
+    const set = new Set<string>();
+    classrooms
+      .filter((c) => c.grade === filterGrade)
+      .forEach((c) => set.add(c.name.toUpperCase()));
+    accountScopedSubmissions
+      .filter((s) => s.grade === filterGrade)
+      .forEach((s) => {
+        if (s.className) set.add(s.className.toUpperCase());
+      });
+    return Array.from(set).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }, [classrooms, filterGrade, accountScopedSubmissions]);
 
   // Step 2: Apply UI sub-filters within the allowed account scope
   const filteredClassBoard = accountScopedSubmissions.filter((sub) => {
@@ -137,7 +158,7 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
 
   const handleDownloadPdf = () => {
     const reportContent = [
-      'PHIẾU BÁO ĐIỂM KHẢO THÍ TRỰC TUYẾN EDUEXAM PRO (CLOUD FIRESTORE)',
+      'PHIẾU BÁO ĐIỂM KHẢO THÍ TRỰC TUYẾN EDUEXAM PRO (DATABASE EXPORT)',
       '==================================================================',
       `Họ và tên thí sinh: ${registration.fullName || 'Chưa nộp bài'}`,
       `Lớp: ${registration.studentClass || '--'} - Khối ${registration.grade} THCS`,
@@ -162,8 +183,110 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    setPdfNotice('Đã tải xuống Phiếu Điểm điện tử từ Cloud Firestore!');
+    setPdfNotice('Đã tải xuống Phiếu Điểm điện tử định dạng .TXT!');
     window.setTimeout(() => setPdfNotice(null), 3500);
+  };
+
+  const handleExportScoreboardCsv = (mode: 'filtered' | 'all' = 'filtered') => {
+    const targetRecords =
+      mode === 'all' ? accountScopedSubmissions : filteredClassBoard;
+    if (targetRecords.length === 0) {
+      setCsvNotice('Chưa có bài thi nào trong bảng điểm để xuất CSV!');
+      window.setTimeout(() => setCsvNotice(null), 3500);
+      return;
+    }
+
+    const gradeLabel = isSystemAdmin
+      ? `Khối ${filterGrade}`
+      : `Khối ${loggedInStudent?.grade || registration.grade}`;
+    const classLabel =
+      filterClass === 'ALL' ? 'Tất cả lớp' : `Lớp ${filterClass}`;
+    const subjectLabel =
+      filterSubject === 'ALL' ? 'Tất cả môn' : `Môn ${filterSubject}`;
+    const examLabel = exam.title
+      ? `${exam.code} - ${exam.title}`
+      : 'Tất cả đề kiểm tra';
+
+    const csvContent = exportSubmissionsToCsvString(targetRecords, {
+      gradeLabel,
+      classLabel,
+      subjectLabel,
+      examLabel,
+      exportedBy:
+        currentTeacher?.fullName ||
+        (loggedInStudent
+          ? `Học sinh ${loggedInStudent.fullName}`
+          : 'Hội Đồng Khảo Thí THCS'),
+    });
+
+    const fileName = `Bang_Diem_Hoc_Sinh_${gradeLabel.replace(
+      /\s+/g,
+      '_'
+    )}_${classLabel.replace(/\s+/g, '_')}_${subjectLabel.replace(
+      /\s+/g,
+      '_'
+    )}_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setCsvNotice(
+      `Đã xuất thành công bảng điểm CSV gồm ${targetRecords.length} bài thi để giáo viên lưu trữ hồ sơ học tập!`
+    );
+    window.setTimeout(() => setCsvNotice(null), 4500);
+  };
+
+  const handleDownloadStudentScoreCsv = () => {
+    const studentRecord: StudentRecord = {
+      stt: '01',
+      id: `sub_${registration.grade}_${registration.studentClass}_${Date.now()}`,
+      name: registration.fullName || 'Học sinh',
+      grade: registration.grade,
+      className: registration.studentClass,
+      subject: registration.selectedSubject || exam.subject,
+      examId: exam.id,
+      examTitle: exam.title,
+      duration: `${formatTimer(durationSeconds)}s`,
+      durationSeconds,
+      tabLeaves: tabViolations,
+      warningText:
+        tabViolations > 0 ? `${tabViolations} lần rời tab` : 'Nghiêm túc',
+      warningType: tabViolations > 0 ? 'tab-warning' : 'clean',
+      rawScore,
+      penaltyText: `-${tabPenalty.toFixed(1)} điểm`,
+      finalScore,
+      rank,
+      status: 'Đạt chuẩn',
+      submittedAt: new Date().toISOString(),
+    };
+    const csvContent = exportSubmissionsToCsvString([studentRecord], {
+      gradeLabel: `Khối ${registration.grade}`,
+      classLabel: `Lớp ${registration.studentClass}`,
+      subjectLabel: `Môn ${registration.selectedSubject}`,
+      examLabel: `${exam.code} - ${exam.title}`,
+      exportedBy: registration.fullName || 'Học sinh',
+    });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bang_Diem_Ca_Nhan_Lop${registration.studentClass}_${(
+      registration.fullName || 'HocSinh'
+    ).replace(/\s+/g, '_')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setCsvNotice('Đã xuất thành công Phiếu Báo Điểm cá nhân sang định dạng CSV!');
+    window.setTimeout(() => setCsvNotice(null), 3500);
   };
 
   return (
@@ -374,16 +497,30 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
                         / 10 điểm
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleDownloadPdf}
-                      className="mt-2 inline-flex items-center gap-1 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">
-                        download
-                      </span>
-                      Tải Phiếu Điểm (.TXT)
-                    </button>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        className="inline-flex items-center gap-1 text-xs bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded cursor-pointer transition-colors"
+                        title="Tải phiếu điểm dạng văn bản thuần .TXT"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          download
+                        </span>
+                        Tải Phiếu Điểm (.TXT)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadStudentScoreCsv}
+                        className="inline-flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded cursor-pointer font-semibold shadow-sm transition-colors"
+                        title="Xuất phiếu điểm cá nhân ra file CSV chuẩn bảng tính Excel"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          table_chart
+                        </span>
+                        Xuất Phiếu Điểm (.CSV)
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -391,6 +528,15 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
               {pdfNotice && (
                 <div className="p-2.5 rounded-lg bg-tertiary-container text-on-tertiary font-label-md text-label-md">
                   {pdfNotice}
+                </div>
+              )}
+
+              {csvNotice && (
+                <div className="p-2.5 rounded-lg bg-emerald-700 text-white font-label-md text-label-md flex items-center gap-2 shadow-sm">
+                  <span className="material-symbols-outlined text-[18px]">
+                    file_download_done
+                  </span>
+                  <span>{csvNotice}</span>
                 </div>
               )}
 
@@ -690,28 +836,66 @@ export const ResultsReport: React.FC<ResultsReportProps> = ({
                     aria-label="Lọc theo lớp học"
                     value={filterClass}
                     onChange={(e) => setFilterClass(e.target.value)}
-                    className="bg-surface-container-low text-on-surface font-label-md text-label-md px-3 py-1.5 rounded-lg cursor-pointer"
+                    className="bg-surface-container-low text-on-surface font-label-md text-label-md px-3 py-1.5 rounded-lg cursor-pointer font-semibold"
                   >
                     <option value="ALL">
                       Tất cả các lớp Khối {filterGrade}
                     </option>
-                    <option value={`${filterGrade}A1`}>
-                      Lớp {filterGrade}A1
-                    </option>
-                    <option value={`${filterGrade}A2`}>
-                      Lớp {filterGrade}A2
-                    </option>
-                    <option value={`${filterGrade}A3`}>
-                      Lớp {filterGrade}A3
-                    </option>
-                    <option value={`${filterGrade}B1`}>
-                      Lớp {filterGrade}B1
-                    </option>
+                    {availableClassNames.map((cls) => (
+                      <option key={cls} value={cls}>
+                        Lớp {cls}
+                      </option>
+                    ))}
                   </select>
                 </>
               )}
+
+              <button
+                type="button"
+                onClick={() => handleExportScoreboardCsv('filtered')}
+                disabled={filteredClassBoard.length === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-label-md text-label-md font-semibold shadow-sm transition-colors cursor-pointer"
+                title="Xuất danh sách bài thi đang hiển thị ra file CSV lưu trữ hồ sơ học tập"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  file_download
+                </span>
+                Xuất Bảng Điểm CSV ({filteredClassBoard.length})
+              </button>
+
+              {accountScopedSubmissions.length > filteredClassBoard.length && (
+                <button
+                  type="button"
+                  onClick={() => handleExportScoreboardCsv('all')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md font-semibold transition-colors cursor-pointer border border-outline-variant/40"
+                  title="Xuất toàn bộ bài thi trong phạm vi phân quyền ra file CSV"
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    download_for_offline
+                  </span>
+                  Xuất Tất Cả ({accountScopedSubmissions.length})
+                </button>
+              )}
             </div>
           </div>
+
+          {csvNotice && (
+            <div className="p-3 rounded-lg bg-emerald-700 text-white font-label-md text-label-md flex items-center justify-between shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">
+                  check_circle
+                </span>
+                <span>{csvNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCsvNotice(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
 
           {filteredClassBoard.length === 0 ? (
             <div className="p-space-xl rounded-xl bg-surface-container-low text-center flex flex-col items-center gap-2">

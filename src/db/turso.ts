@@ -1,9 +1,9 @@
-import { createClient, Client } from '@libsql/client';
+import { createClient, type Client } from '@libsql/client';
 import {
   DEFAULT_CLASSROOMS,
   DEFAULT_STUDENT_ACCOUNTS,
   DEFAULT_TEACHER_ACCOUNTS,
-} from '../utils/examLogic.js';
+} from '../utils/examLogic.ts';
 
 let tursoClient: Client | null = null;
 let currentDbConfig = {

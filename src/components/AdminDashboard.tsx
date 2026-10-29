@@ -495,7 +495,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     const fileName =
       mode === 'all'
-        ? `Bang_Diem_Firebase_${
+        ? `Bang_Diem_THCS_${
             effectiveSubjectFilter === 'ALL' ? 'Toan_Truong' : effectiveSubjectFilter
           }_${new Date().toISOString().slice(0, 10)}.csv`
         : `Bang_Diem_Khoi${selectedGrade}_${selectedClass}_Mon_${effectiveSubjectFilter}.csv`;
