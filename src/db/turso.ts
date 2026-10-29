@@ -11,7 +11,7 @@ const DEFAULT_TURSO_CLOUD_TOKEN =
   'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTMyNTg0NzQsImlkIjoiMDFhMTg2ODYtOWUwMS03NjU0LThjMDMtMDNmZTRiMzc3M2Q1Iiwia2lkIjoiRk96Rm5ZamtjNDRRZDhpUDhCZXhmZUlxVFB0TXNjYm1KOWtsT1dnc0YyRSIsInJpZCI6ImE4Yjk4MWRlLTBmNWUtNGI1MS1hNDE1LWViZjkyODYzODk4YSJ9.rlaN8HLRdDUsU1ww94JK5yJ9MPP4KKf6qd0e3Uii9Q6Gt49uHhXOJfUvxfaJpVdYmjoccm-P_DzHjQJjAL4pDA';
 
 let tursoClient: Client | null = null;
-let currentDbConfig = {
+let currentDbConfig: { url: string; authToken?: string } = {
   url: process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_CLOUD_URL,
   authToken: process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_CLOUD_TOKEN,
 };

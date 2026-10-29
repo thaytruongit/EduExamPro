@@ -17,8 +17,12 @@ let webTursoInitPromise: Promise<void> | null = null;
 
 function getWebTursoClient(): Client {
   if (!webTursoClient) {
+    let url = TURSO_CLOUD_URL;
+    if (url.startsWith('libsql://')) {
+      url = url.replace('libsql://', 'https://');
+    }
     webTursoClient = createClient({
-      url: TURSO_CLOUD_URL,
+      url,
       authToken: TURSO_CLOUD_TOKEN,
     });
   }
@@ -183,8 +187,12 @@ export async function connectTursoCloud(
   } catch {}
 
   try {
+    let targetUrl = url || TURSO_CLOUD_URL;
+    if (targetUrl.startsWith('libsql://')) {
+      targetUrl = targetUrl.replace('libsql://', 'https://');
+    }
     webTursoClient = createClient({
-      url: url || TURSO_CLOUD_URL,
+      url: targetUrl,
       authToken: authToken || TURSO_CLOUD_TOKEN,
     });
     webTursoInitPromise = null;
