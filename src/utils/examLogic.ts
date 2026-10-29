@@ -115,16 +115,8 @@ export const LEGACY_DEMO_TEACHER_USERNAMES = new Set<string>([
 ]);
 
 export function isLegacyDemoTeacherAccount(
-  account?: Partial<TeacherAccount> | null
+  _account?: Partial<TeacherAccount> | null
 ): boolean {
-  if (!account) return false;
-  if (account.id && LEGACY_DEMO_TEACHER_IDS.has(account.id)) return true;
-  if (
-    account.username &&
-    LEGACY_DEMO_TEACHER_USERNAMES.has(account.username.toLowerCase())
-  ) {
-    return true;
-  }
   return false;
 }
 
@@ -136,6 +128,94 @@ export const DEFAULT_TEACHER_ACCOUNTS: TeacherAccount[] = [
     subject: 'ALL',
     passcode: '123',
     role: 'admin',
+  },
+  {
+    id: 'teacher-tin-01',
+    username: 'gv.tin',
+    fullName: 'Thầy Trường (GV Tin học)',
+    subject: 'Tin',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-toan-01',
+    username: 'gv.toan',
+    fullName: 'Cô Nguyễn Thị Lan (GV Toán)',
+    subject: 'Toán',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-van-01',
+    username: 'gv.van',
+    fullName: 'Thầy Tuân (GV Ngữ văn)',
+    subject: 'Văn',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-anh-01',
+    username: 'gv.anh',
+    fullName: 'Cô Lê Mai Hương (GV Tiếng Anh)',
+    subject: 'Anh',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-ly-01',
+    username: 'gv.ly',
+    fullName: 'Thầy Ngô Quang Huy (GV Vật lý)',
+    subject: 'Lý',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-hoa-01',
+    username: 'gv.hoa',
+    fullName: 'Cô Đỗ Thúy Quỳnh (GV Hóa học)',
+    subject: 'Hoá',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-sinh-01',
+    username: 'gv.sinh',
+    fullName: 'Cô Phạm Thị Mai (GV Sinh học)',
+    subject: 'Sinh',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-su-01',
+    username: 'gv.su',
+    fullName: 'Thầy Hoàng Văn Nam (GV Lịch sử)',
+    subject: 'Sử',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-dia-01',
+    username: 'gv.dia',
+    fullName: 'Cô Vũ Thị Hồng (GV Địa lý)',
+    subject: 'Địa',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-congnghe-01',
+    username: 'gv.congnghe',
+    fullName: 'Thầy Đặng Văn An (GV Công nghệ)',
+    subject: 'Công Nghệ',
+    passcode: '123',
+    role: 'teacher',
+  },
+  {
+    id: 'teacher-gdcd-01',
+    username: 'gv.gdcd',
+    fullName: 'Cô Bùi Thị Nga (GV GDCD)',
+    subject: 'GDCD',
+    passcode: '123',
+    role: 'teacher',
   },
 ];
 
@@ -286,7 +366,58 @@ export interface StudentAccount {
   createdAt: string;
 }
 
-export const DEFAULT_STUDENT_ACCOUNTS: StudentAccount[] = [];
+export const DEFAULT_STUDENT_ACCOUNTS: StudentAccount[] = [
+  {
+    id: 'stu-6a10-01',
+    fullName: 'Nguyễn Văn An',
+    dateOfBirth: '2013-05-15',
+    studentClass: '6A10',
+    grade: 6,
+    username: 'hs.6a10',
+    password: '123',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'stu-7a10-01',
+    fullName: 'Trần Thị Bình',
+    dateOfBirth: '2012-08-20',
+    studentClass: '7A10',
+    grade: 7,
+    username: 'hs.7a10',
+    password: '123',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'stu-8a11-01',
+    fullName: 'Lê Minh Cường',
+    dateOfBirth: '2011-03-10',
+    studentClass: '8A11',
+    grade: 8,
+    username: 'hs.8a11',
+    password: '123',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'stu-9a13-01',
+    fullName: 'Phạm Đức Dũng',
+    dateOfBirth: '2010-11-25',
+    studentClass: '9A13',
+    grade: 9,
+    username: 'hs.9a13',
+    password: '123',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'stu-9a14-01',
+    fullName: 'Hoàng Thị Dung',
+    dateOfBirth: '2010-09-12',
+    studentClass: '9A14',
+    grade: 9,
+    username: 'hs.9a14',
+    password: '123',
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+];
 
 export interface StudentRegistration {
   grade: number;

@@ -51,21 +51,21 @@ import {
   TeacherAccount,
 } from './utils/examLogic';
 
-function ensureCleanLocalCacheV3() {
+function ensureCleanLocalCacheV5() {
   try {
-    if (localStorage.getItem('app_clean_init_v3') !== 'true') {
+    if (localStorage.getItem('app_clean_init_v5') !== 'true') {
       localStorage.removeItem('app_classrooms_backup');
       localStorage.removeItem('app_student_accounts_backup');
       localStorage.removeItem('app_teacher_accounts_backup');
       localStorage.removeItem('app_exams_backup');
       localStorage.removeItem('app_submissions_backup');
-      localStorage.setItem('app_clean_init_v3', 'true');
+      localStorage.setItem('app_clean_init_v5', 'true');
     }
   } catch {}
 }
 
 export default function App() {
-  ensureCleanLocalCacheV3();
+  ensureCleanLocalCacheV5();
 
   const [activeScreen, setActiveScreen] = useState<ScreenId>('cong-vao-thi');
 
@@ -193,26 +193,40 @@ export default function App() {
     const loadTursoData = async () => {
       try {
         const classroomsData = await getTursoConfig<ClassroomRecord[]>('classrooms');
-        if (Array.isArray(classroomsData) && classroomsData.length > 0) {
-          setClassrooms(classroomsData);
+        if (Array.isArray(classroomsData)) {
+          const classMap = new Map<string, ClassroomRecord>();
+          DEFAULT_CLASSROOMS.forEach((c) => classMap.set(c.name.toUpperCase(), c));
+          classroomsData.forEach((c) => classMap.set(c.name.toUpperCase(), c));
+          const mergedClasses = Array.from(classMap.values()).sort(
+            (a, b) => a.grade - b.grade || a.name.localeCompare(b.name, undefined, { numeric: true })
+          );
+          setClassrooms(mergedClasses);
           try {
-            localStorage.setItem('app_classrooms_backup', JSON.stringify(classroomsData));
+            localStorage.setItem('app_classrooms_backup', JSON.stringify(mergedClasses));
           } catch {}
         }
 
         const studentAccountsData = await getTursoConfig<StudentAccount[]>('studentAccounts');
         if (Array.isArray(studentAccountsData)) {
-          setStudentAccounts(studentAccountsData);
+          const studentMap = new Map<string, StudentAccount>();
+          DEFAULT_STUDENT_ACCOUNTS.forEach((s) => studentMap.set(s.username.toLowerCase(), s));
+          studentAccountsData.forEach((s) => studentMap.set(s.username.toLowerCase(), s));
+          const mergedStudents = Array.from(studentMap.values());
+          setStudentAccounts(mergedStudents);
           try {
-            localStorage.setItem('app_student_accounts_backup', JSON.stringify(studentAccountsData));
+            localStorage.setItem('app_student_accounts_backup', JSON.stringify(mergedStudents));
           } catch {}
         }
 
         const teachersData = await getTursoConfig<TeacherAccount[]>('teachers');
-        if (Array.isArray(teachersData) && teachersData.length > 0) {
-          setTeacherAccounts(teachersData);
+        if (Array.isArray(teachersData)) {
+          const teacherMap = new Map<string, TeacherAccount>();
+          DEFAULT_TEACHER_ACCOUNTS.forEach((t) => teacherMap.set(t.username.toLowerCase(), t));
+          teachersData.forEach((t) => teacherMap.set(t.username.toLowerCase(), t));
+          const mergedTeachers = Array.from(teacherMap.values());
+          setTeacherAccounts(mergedTeachers);
           try {
-            localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(teachersData));
+            localStorage.setItem('app_teacher_accounts_backup', JSON.stringify(mergedTeachers));
           } catch {}
         }
 

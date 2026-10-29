@@ -97,7 +97,7 @@ async function ensureWebTursoInitialized(): Promise<Client> {
 
       const checkInit = await db.execute({
         sql: 'SELECT value_json FROM admin_config WHERE key = ?',
-        args: ['clean_init_v3'],
+        args: ['clean_init_v5'],
       });
 
       if (checkInit.rows.length === 0) {
@@ -107,15 +107,17 @@ async function ensureWebTursoInitialized(): Promise<Client> {
           ['teachers', DEFAULT_TEACHER_ACCOUNTS],
           ['classrooms', DEFAULT_CLASSROOMS],
           ['studentAccounts', DEFAULT_STUDENT_ACCOUNTS],
-          ['examBankSettings', { purgedDemoExams: true, deletedDemoExamIds: [] }],
-          ['clean_init_v3', { initialized: true, updatedAt: nowIso }],
+          ['examBankSettings', { purgedDemoExams: false, deletedDemoExamIds: [] }],
+          ['clean_init_v5', { initialized: true, updatedAt: nowIso }],
         ];
         for (const [k, val] of seedEntries) {
           await db.execute({
             sql: `
               INSERT INTO admin_config (key, value_json, updated_at)
               VALUES (?, ?, ?)
-              ON CONFLICT(key) DO NOTHING
+              ON CONFLICT(key) DO UPDATE SET
+                value_json = excluded.value_json,
+                updated_at = excluded.updated_at
             `,
             args: [k, JSON.stringify(val), nowIso],
           });

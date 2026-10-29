@@ -144,27 +144,22 @@ export async function initTursoTables() {
     );
   `);
 
-  // Perform automatic clean baseline setup (v3) if not yet applied
+  // Perform automatic clean baseline setup (v5) if not yet applied
   const checkInit = await db.execute({
     sql: 'SELECT value_json FROM admin_config WHERE key = ?',
-    args: ['clean_init_v3'],
+    args: ['clean_init_v5'],
   });
 
   if (checkInit.rows.length === 0) {
     const nowIso = new Date().toISOString();
-
-    // Clear all old/default exams, submissions, and sessions
-    await db.execute('DELETE FROM exams');
-    await db.execute('DELETE FROM submissions');
-    await db.execute('DELETE FROM exam_sessions');
 
     const seedEntries: Array<[string, unknown]> = [
       ['security', { passcode: '123' }],
       ['teachers', DEFAULT_TEACHER_ACCOUNTS],
       ['classrooms', DEFAULT_CLASSROOMS],
       ['studentAccounts', DEFAULT_STUDENT_ACCOUNTS],
-      ['examBankSettings', { purgedDemoExams: true, deletedDemoExamIds: [] }],
-      ['clean_init_v3', { initialized: true, updatedAt: nowIso }],
+      ['examBankSettings', { purgedDemoExams: false, deletedDemoExamIds: [] }],
+      ['clean_init_v5', { initialized: true, updatedAt: nowIso }],
     ];
 
     for (const [k, val] of seedEntries) {
